@@ -1,0 +1,29 @@
+[
+    {
+        "name": "Jan",
+        "surname": "Kowalski",
+        "citizenship": "Ukraina",
+        "email": "jan.kowalski@example.com",
+        "phone": "123456789",
+        "application_type": "osoba dorosła",
+        "priority": 0
+    },
+    {
+        "name": "Anna",
+        "surname": "Nowak",
+        "citizenship": "Białoruś",
+        "email": "anna.nowak@example.com",
+        "phone": "987654321",
+        "application_type": "osoba dorosła i małoletnie dzieci",
+        "priority": 0
+    },
+    {
+        "name": "Petro",
+        "surname": "Ivanov",
+        "citizenship": "Rosja",
+        "email": "petro.ivanov@example.com",
+        "phone": "555123456",
+        "application_type": "małoletni",
+        "priority": 0
+    }
+]
