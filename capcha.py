@@ -34,5 +34,3 @@ def solve_base64(base_64_capcha:str):
     data = response.json()
     return data
     
-result = solve('cap_img/cap_4.png')
-print(result['result'])

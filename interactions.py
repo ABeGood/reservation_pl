@@ -11,10 +11,12 @@ from datetime import datetime
 import logging
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 from selenium.webdriver.common.action_chains import ActionChains
+from capcha import solve_base64
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 
 class PolishCardFormFiller:
     def __init__(self, json_file_path, webdriver_path=None):
@@ -117,7 +119,7 @@ class PolishCardFormFiller:
             logger.info(f"Surname field filled with: {person_data['surname']}")
             
             # Optional: Add a small delay to ensure fields are properly filled
-            time.sleep(1)
+            time.sleep(0.5)
             
             # Verify the fields were filled correctly
             filled_name = name_field.get_attribute('value')
@@ -205,7 +207,7 @@ class PolishCardFormFiller:
                     
                     if i > 0:  # Refresh page for subsequent entries
                         self.driver.refresh()
-                        time.sleep(2)
+                        time.sleep(0.2)
                     
                     self.fill_name_fields(person)
                     
@@ -214,7 +216,7 @@ class PolishCardFormFiller:
                     
                     # Pause between entries
                     if i < len(data) - 1:
-                        time.sleep(3)
+                        time.sleep(0.2)
             else:
                 logger.info("Processing single person from JSON file")
                 self.fill_name_fields(data)
@@ -239,47 +241,25 @@ class PolishCardFormFiller:
             self.driver.quit()
             logger.info("WebDriver closed")
 
-def create_sample_json():
-    """Create a sample JSON file for testing"""
-    sample_data = [
-        {
-            "name": "Jan",
-            "surname": "Kowalski",
-            "citizenship": "Ukraina",
-            "email": "jan.kowalski@example.com",
-            "phone": "123456789",
-            "application_type": "osoba dorosła"
-        },
-        {
-            "name": "Anna",
-            "surname": "Nowak",
-            "citizenship": "Białoruś",
-            "email": "anna.nowak@example.com",
-            "phone": "987654321",
-            "application_type": "osoba dorosła i małoletnie dzieci"
-        }
-    ]
-    
-    with open('people_data.json', 'w', encoding='utf-8') as f:
-        json.dump(sample_data, f, ensure_ascii=False, indent=2)
-    
-    print("Sample JSON file 'people_data.json' created successfully")
-
 
 class DatePickerScanner:
-    def __init__(self, webdriver_path=None):
+    def __init__(self, json_file_path=None, webdriver_path=None):
         """
         Initialize the date picker scanner
         
         Args:
+            json_file_path (str): Path to JSON file containing person data for booking
             webdriver_path (str): Path to ChromeDriver executable (optional)
+            auto_book (bool): Whether to automatically attempt booking when slots are found
         """
+        self.json_file_path = json_file_path
         self.webdriver_path = webdriver_path
         self.driver = None
         self.wait = None
         self.available_slots = {}
         self.current_month = None
         self.current_year = None
+        self.person_data = None
         
     def setup_driver(self):
         """Configure and initialize Chrome WebDriver"""
@@ -355,6 +335,23 @@ class DatePickerScanner:
         except TimeoutException:
             logger.error("Timeout waiting for datepicker or calendar")
             return False
+    
+    def close_calendar(self):
+        """Close the calendar if it's open"""
+        try:
+            # Try clicking elsewhere to close calendar
+            form_element = self.driver.find_element(By.ID, "for_rezerwacji")
+            form_element.click()
+            time.sleep(0.2)
+            
+            # Alternative: Press Escape key
+            self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+            time.sleep(0.2)
+            
+            logger.debug("Calendar closed")
+            
+        except Exception as e:
+            logger.debug(f"Error closing calendar (may already be closed): {e}")
         except Exception as e:
             logger.error(f"Error clicking datepicker: {e}")
             return False
@@ -438,22 +435,249 @@ class DatePickerScanner:
             logger.error(f"Error getting clickable dates: {e}")
             return []
     
-    def close_calendar(self):
-        """Close the calendar if it's open"""
+    def load_person_data(self):
+        """Load person data from JSON file for booking"""
+        if not self.json_file_path:
+            logger.warning("No JSON file path provided - booking functionality disabled")
+            return None
+            
         try:
-            # Try clicking elsewhere to close calendar
-            form_element = self.driver.find_element(By.ID, "for_rezerwacji")
-            form_element.click()
-            time.sleep(0.5)
+            with open(self.json_file_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                
+                # Handle both single person and list of people
+                if isinstance(data, list):
+                    self.person_data = data[0]  # Use first person
+                    logger.info(f"Loaded data for: {self.person_data.get('name', 'Unknown')}")
+                else:
+                    self.person_data = data
+                    logger.info(f"Loaded data for: {self.person_data.get('name', 'Unknown')}")
+                
+                return self.person_data
+                
+        except FileNotFoundError:
+            logger.error(f"JSON file not found: {self.json_file_path}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON format: {e}")
+            return None
+    
+    def fill_form_data(self, person_data):
+        """Fill the appointment form with person data"""
+        try:
+            logger.info("Filling form with person data...")
             
-            # Alternative: Press Escape key
-            self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-            time.sleep(0.3)
+            # Fill name
+            name_field = self.wait.until(EC.element_to_be_clickable((By.ID, "imie")))
+            name_field.clear()
+            name_field.send_keys(person_data['name'])
+            logger.info(f"Name filled: {person_data['name']}")
             
-            logger.debug("Calendar closed")
+            # Fill surname
+            surname_field = self.wait.until(EC.element_to_be_clickable((By.ID, "nazwisko")))
+            surname_field.clear()
+            surname_field.send_keys(person_data['surname'])
+            logger.info(f"Surname filled: {person_data['surname']}")
+            
+            # Fill citizenship
+            if 'citizenship' in person_data:
+                citizenship_dropdown = self.wait.until(EC.element_to_be_clickable((By.ID, "obywatel")))
+                citizenship_dropdown.send_keys(person_data['citizenship'])
+                logger.info(f"Citizenship filled: {person_data['citizenship']}")
+            
+            # Fill email
+            if 'email' in person_data:
+                email_field = self.wait.until(EC.element_to_be_clickable((By.ID, "email")))
+                email_field.clear()
+                email_field.send_keys(person_data['email'])
+                logger.info(f"Email filled: {person_data['email']}")
+            
+            # Fill phone
+            if 'phone' in person_data:
+                phone_field = self.wait.until(EC.element_to_be_clickable((By.ID, "telefon")))
+                phone_field.clear()
+                phone_field.send_keys(person_data['phone'])
+                logger.info(f"Phone filled: {person_data['phone']}")
+            
+            # Fill application type
+            if 'application_type' in person_data:
+                app_type_dropdown = self.wait.until(EC.element_to_be_clickable((By.ID, "rodzaj")))
+                app_type_dropdown.send_keys(person_data['application_type'])
+                logger.info(f"Application type filled: {person_data['application_type']}")
+            
+            # Add small delay to ensure fields are properly filled
+            time.sleep(0.4)
+            
+            return True
             
         except Exception as e:
-            logger.debug(f"Error closing calendar (may already be closed): {e}")
+            logger.error(f"Error filling form data: {e}")
+            return False
+    
+    def select_time_slot(self, available_slots, date_str):
+        """Select the first available time slot"""
+        try:
+            if not available_slots:
+                return False
+            
+            # Select first available slot
+            selected_time = available_slots[0]
+            logger.info(f"Attempting to select time slot: {selected_time}")
+            
+            # Find the time slot container
+            time_slot_container = self.driver.find_element(By.ID, "class_godzina")
+            
+            # Look for radio button inputs with class="intro"
+            radio_inputs = time_slot_container.find_elements(By.CSS_SELECTOR, "input[type='radio'][name='godzina'].intro")
+            
+            for radio in radio_inputs:
+                value = radio.get_attribute("value")
+                if value and value.endswith(selected_time):  # Match time at end of value (A209:00 ends with 09:00)
+                    # Get the radio button ID
+                    radio_id = radio.get_attribute("id")
+                    
+                    # Find the corresponding label
+                    label = time_slot_container.find_element(By.CSS_SELECTOR, f"label[for='{radio_id}']")
+                    
+                    # Scroll into view and click the label
+                    self.driver.execute_script("arguments[0].scrollIntoView(true);", label)
+                    time.sleep(0.5)
+                    label.click()
+                    
+                    # Verify selection
+                    time.sleep(0.3)
+                    if radio.is_selected():
+                        logger.info(f"✓ Successfully selected time slot: {selected_time}")
+                        return True
+                    else:
+                        # Try JavaScript click on label
+                        self.driver.execute_script("arguments[0].click();", label)
+                        time.sleep(0.3)
+                        if radio.is_selected():
+                            logger.info(f"✓ Successfully selected time slot using JavaScript: {selected_time}")
+                            return True
+            
+            logger.error(f"Could not select time slot: {selected_time}")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error selecting time slot: {e}")
+            return False
+    
+    def extract_captcha_base64(self):
+        """Extract CAPTCHA image as base64"""
+        try:
+            # Find the CAPTCHA image
+            captcha_img = self.driver.find_element(By.ID, "captcha_image")
+            
+            # Get the image source URL
+            img_src = captcha_img.get_attribute("src")
+            logger.info(f"CAPTCHA image source: {img_src}")
+            
+            # Get the image as base64
+            base64_string = self.driver.execute_script("""
+                var canvas = document.createElement('canvas');
+                var ctx = canvas.getContext('2d');
+                var img = arguments[0];
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                ctx.drawImage(img, 0, 0);
+                return canvas.toDataURL('image/png').substring(22);
+            """, captcha_img)
+            
+            logger.info("CAPTCHA image extracted as base64")
+            return base64_string
+            
+        except Exception as e:
+            logger.error(f"Error extracting CAPTCHA base64: {e}")
+            return None
+    
+    def fill_captcha_and_submit(self, captcha_solution):
+        """Fill CAPTCHA solution and submit the form"""
+        try:
+            # Fill CAPTCHA field
+            captcha_field = self.driver.find_element(By.ID, "captcha_code")
+            captcha_field.clear()
+            captcha_field.send_keys(captcha_solution['result'])
+            logger.info(f"CAPTCHA solution entered: {captcha_solution}")
+            
+            # Submit the form
+            submit_button = self.driver.find_element(By.CSS_SELECTOR, "input[type='submit']")
+            
+            # Scroll to submit button and click
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", submit_button)
+            time.sleep(1)
+            submit_button.click()
+            
+            logger.info("Form submitted")
+            
+            # Wait for response
+            time.sleep(10)
+            return True
+            
+            # Check for success/error messages
+            # page_text = self.driver.page_source.lower()
+            
+            # if "potwierdz" in page_text or "rezerwacja" in page_text or "dziękuj" in page_text:
+            #     logger.info("✓ BOOKING APPEARS SUCCESSFUL!")
+            #     return True
+            # else:
+            #     logger.warning("Booking result unclear - check manually")
+            #     return False
+            
+        except Exception as e:
+            logger.error(f"Error filling CAPTCHA and submitting: {e}")
+            return False
+    
+    def attempt_booking(self, available_slots, date_str):
+        """Attempt to book an appointment with available slots"""
+        try:
+            if not self.person_data:
+                logger.error("No person data available for booking")
+                return False
+            
+            logger.info(f"\n🎯 ATTEMPTING BOOKING for {self.person_data['name']} on {date_str}")
+            logger.info(f"Available slots: {', '.join(available_slots)}")
+            
+            # Step 1: Fill form data (if not already filled)
+            if not self.fill_form_data(self.person_data):
+                logger.error("Failed to fill form data")
+                return False
+            
+            # Step 2: Select time slot
+            if not self.select_time_slot(available_slots, date_str):
+                logger.error("Failed to select time slot")
+                return False
+            
+            # Step 3: Extract CAPTCHA
+            captcha_base64 = self.extract_captcha_base64()
+            if not captcha_base64:
+                logger.error("Failed to extract CAPTCHA")
+                return False
+            
+            # Step 4: Solve CAPTCHA
+            captcha_solution = solve_base64(captcha_base64)
+            if not captcha_solution:
+                logger.error("Failed to solve CAPTCHA")
+                return False
+            
+            # Step 5: Submit booking
+            if self.fill_captcha_and_submit(captcha_solution):
+                booking_record = {
+                    'person': f"{self.person_data['name']} {self.person_data['surname']}",
+                    'date': date_str,
+                    'time': available_slots[0],
+                    'timestamp': datetime.now().isoformat()
+                }
+                logger.info(f"✅ BOOKING SUCCESSFUL: {booking_record}")
+                return True
+            else:
+                logger.error("❌ BOOKING FAILED")
+                return False
+            
+        except Exception as e:
+            logger.error(f"Error during booking attempt: {e}")
+            return False
     
     def click_specific_date(self, date_info):
         """
@@ -490,7 +714,7 @@ class DatePickerScanner:
                     if day == target_day and data_month == target_month and data_year == target_year:
                         # Scroll element into view
                         self.driver.execute_script("arguments[0].scrollIntoView(true);", date_element)
-                        time.sleep(0.3)
+                        time.sleep(0.2)
                         
                         # Click the date
                         date_element.click()
@@ -554,7 +778,7 @@ class DatePickerScanner:
         """Check for available time slots after selecting a date"""
         try:
             # Wait for the time slot container to update
-            time.sleep(2)
+            time.sleep(0.2)
             
             # Look for time slot elements in the godzina container
             time_slot_container = self.driver.find_element(By.ID, "class_godzina")
@@ -624,7 +848,7 @@ class DatePickerScanner:
                 ".ui-datepicker-next:not(.ui-state-disabled)"
             )
             next_button.click()
-            time.sleep(1)
+            time.sleep(0.2)
             
             logger.info("Navigated to next month")
             return True
@@ -649,6 +873,13 @@ class DatePickerScanner:
         try:
             self.setup_driver()
             self.navigate_to_form(url)
+            
+            # Load person data 
+            self.load_person_data()
+            if self.person_data:
+                logger.info(f"🤖 AUTO-BOOKING ENABLED for: {self.person_data.get('name', 'Unknown')} {self.person_data.get('surname', '')}")
+            else:
+                logger.warning("Auto-booking enabled but no valid person data found")
             
             months_scanned = 0
             total_dates_checked = 0
@@ -701,7 +932,7 @@ class DatePickerScanner:
                     
                     # Step 3: Calendar closes automatically after clicking date
                     # Wait a moment for calendar to close and page to process
-                    time.sleep(0.3)
+                    time.sleep(0.2)
                     
                     # Step 4: Check for available time slots
                     available_slots = self.check_time_slots()
@@ -712,7 +943,16 @@ class DatePickerScanner:
                         logger.info(f"✓ Date {date_info['date_str']}: {len(available_slots)} slots available")
                         for slot in available_slots:
                             logger.info(f"    - {slot}")
-
+                            
+                        if self.attempt_booking(available_slots, date_info['date_str']):
+                            logger.info(f"🎉 BOOKING SUCCESSFUL! Stopping scan.")
+                            # Save results and exit
+                            self.print_scan_summary(total_dates_checked)
+                            self.save_results()
+                            input("\n✅ Booking completed! Press Enter to close browser...")
+                            return True
+                        else:
+                            logger.warning(f"❌ Booking failed for {date_info['date_str']}, continuing scan...")
                         
                     else:
                         logger.info(f"✗ Date {date_info['date_str']}: No available time slots")
@@ -787,17 +1027,9 @@ def main():
     WEBDRIVER_PATH = None  # Set path to chromedriver if not in PATH
     MAX_MONTHS = 3
     
-    # Create sample JSON if it doesn't exist
-    import os
-    if not os.path.exists(JSON_FILE_PATH):
-        create_sample_json()
-        print(f"Created sample JSON file: {JSON_FILE_PATH}")
-        print("Please update the JSON file with your actual data and run the script again.")
-        return
-    
     # Initialize and run form filler
     form_filler = PolishCardFormFiller(JSON_FILE_PATH, WEBDRIVER_PATH)
-    scanner = DatePickerScanner(WEBDRIVER_PATH)
+    scanner = DatePickerScanner(json_file_path='people_data.json')
     
     try:
         # Process form with basic fields (name + surname only)
