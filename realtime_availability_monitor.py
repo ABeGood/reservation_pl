@@ -82,11 +82,17 @@ class RealTimeAvailabilityMonitor:
             }
     
     def get_available_dates(self):
-        """Get available dates based on dynamically extracted datepicker constraints."""
+        """Get available dates from today to the last available in datepicker."""
         config = self.extract_datepicker_config()
         available_dates = []
         
-        current_date = config['min_date']
+        # Start from today, not from datepicker minDate
+        today = datetime.now().date()
+        current_date = max(config['min_date'].date(), today)  # Use today if it's later than minDate
+        current_date = datetime.combine(current_date, datetime.min.time())  # Convert back to datetime
+        
+        print(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
+        
         while current_date <= config['max_date']:
             date_str = current_date.strftime("%Y-%m-%d")
             
@@ -96,6 +102,7 @@ class RealTimeAvailabilityMonitor:
             
             current_date += timedelta(days=1)
         
+        print(f"ℹ️  Days to check: {', '.join(available_dates[:10])}{'...' if len(available_dates) > 10 else ''}")
         print(f"✅ Found {len(available_dates)} potentially available dates")
         return available_dates
     
@@ -127,16 +134,15 @@ class RealTimeAvailabilityMonitor:
         """Single sweep through all available dates."""
         now = datetime.now().strftime('%H:%M:%S')
         print(f"[{now}] Checking {len(self.available_dates)} dates...")
+        print(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
         
         new_slots_found = False
         for i, date_str in enumerate(self.available_dates):
             if not self.running:
                 break
             
-            # Show progress every 10 dates
-            if i > 0 and i % 10 == 0:
-                print(f"  Progress: {i}/{len(self.available_dates)} dates checked...")
-                
+            print(f"ℹ️  Checking date {date_str} ({i+1}/{len(self.available_dates)})...")
+            
             slots = self.check_single_date(date_str)
             
             # Track changes
@@ -155,15 +161,14 @@ class RealTimeAvailabilityMonitor:
                 if date_str in self.results:
                     print(f"❌ REMOVED: {date_str} (no longer available)")
                     del self.results[date_str]
-            
-            # Random delay between requests (0.5-3 seconds)
-            delay = random.uniform(0.5, 3.0)
-            time.sleep(delay)
+                else:
+                    print(f"   No slots available for {date_str}")
+            time.sleep(0.2)
         
         self.stats['last_check'] = datetime.now().isoformat()
         return new_slots_found
     
-    def start_monitoring(self, max_duration_minutes=None, refresh_config_every_hours=6):
+    def start_monitoring(self, max_duration_minutes=None):
         """Start continuous monitoring."""
         print("🚀 Starting real-time availability monitoring...")
         print(f"Monitoring endpoint: {self.base_url}{self.endpoint}")
@@ -172,10 +177,6 @@ class RealTimeAvailabilityMonitor:
         self.running = True
         self.stats['start_time'] = datetime.now().isoformat()
         
-        # Initial config load
-        self.available_dates = self.get_available_dates()
-        last_config_refresh = time.time()
-        
         try:
             start_time = time.time()
             cycle_count = 0
@@ -183,12 +184,8 @@ class RealTimeAvailabilityMonitor:
             while self.running:
                 cycle_count += 1
                 cycle_start = time.time()
-                
-                # Refresh datepicker config periodically
-                if time.time() - last_config_refresh > (refresh_config_every_hours * 3600):
-                    print(f"\n🔄 Refreshing datepicker configuration (cycle {cycle_count})...")
-                    self.available_dates = self.get_available_dates()
-                    last_config_refresh = time.time()
+
+                self.available_dates = self.get_available_dates()
                 
                 # Check all dates once
                 self.check_all_dates_once()
@@ -205,7 +202,7 @@ class RealTimeAvailabilityMonitor:
                 
                 # Wait before next cycle (additional 2-5 seconds between full cycles)
                 cycle_duration = time.time() - cycle_start
-                additional_wait = random.uniform(2.0, 5.0)
+                additional_wait = 0.3
                 print(f"Cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s before next cycle...\n")
                 time.sleep(additional_wait)
                 
