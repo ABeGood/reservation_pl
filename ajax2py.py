@@ -83,8 +83,8 @@ def send_registration_request(base_url:str, registrant_data:dict, capcha:str):
         "email": registrant_data['email'],
         "telefon": registrant_data['phone'],
         "rodzaj_wizyty": registrant_data['registration_type'],
-        "datepicker": # TODO,
-        "godzina": # TODO,
+        # "datepicker": # TODO,
+        # "godzina": # TODO,
         "captcha_code": capcha
     }
 
@@ -95,7 +95,7 @@ def send_registration_request(base_url:str, registrant_data:dict, capcha:str):
 
 
 # Usage examples:
-base_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/"
+# base_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/"
 
 # # Check specific dates
 # dates_to_check = ["2025-06-16", "2025-06-17", "2025-06-18"]
@@ -105,8 +105,8 @@ base_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/"
 
 # print("\n" + "="*50 + "\n")
 
-available = check_multiple_days_with_times("2025-08-05", "2025-11-30", base_url)
-print(f"\nAvailable days: {available}")
+# available = check_multiple_days_with_times("2025-08-05", "2025-11-30", base_url)
+# print(f"\nAvailable days: {available}")
 
-with open('days.json', 'w', encoding='utf-8') as f:
-    json.dump(available, f, ensure_ascii=False, indent=2)
+# with open('days.json', 'w', encoding='utf-8') as f:
+#     json.dump(available, f, ensure_ascii=False, indent=2)
