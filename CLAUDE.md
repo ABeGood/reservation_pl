@@ -26,6 +26,14 @@ This is a Polish Card appointment reservation automation system for the Olsztyn 
    - `solve_base64()` - Solves CAPTCHA from base64 string
    - Uses apitruecaptcha.org API service
 
+4. **realtime_availability_monitor.py** - Real-time monitoring system ⭐ NEW
+   - `RealTimeAvailabilityMonitor` - High-frequency availability checker with parallel processing
+   - Dynamic datepicker configuration extraction from webpage
+   - Monitors only from today to last available date in datepicker
+   - Supports both A1 and A2 room endpoints
+   - Parallel date checking with ThreadPoolExecutor (up to 8x faster)
+   - Thread-safe statistics tracking and comprehensive logging
+
 ### Data Files
 
 - **people_data.json** - Contains person information for form filling (name, surname, citizenship, email, phone, application_type)
@@ -35,7 +43,8 @@ This is a Polish Card appointment reservation automation system for the Olsztyn 
 ### Key URLs and Endpoints
 
 - Base URL: `https://olsztyn.uw.gov.pl/wizytakartapolaka/`
-- Time slots API: `godziny_pokoj_A1.php` (POST with date parameter)
+- Room A1 - Page: `pokoj_A1.php`, Time slots API: `godziny_pokoj_A1.php` (POST with date parameter)
+- Room A2 - Page: `pokoj_A2.php`, Time slots API: `godziny_pokoj_A2.php` (POST with date parameter)
 - Form submission: `send.php`
 - CAPTCHA endpoint: `securimage/securimage_show.php`
 
@@ -59,19 +68,31 @@ The system requires ChromeDriver for Selenium automation. Can be auto-detected o
 
 ## Common Operations
 
-### Run availability scan only
+### Real-time availability monitoring ⭐ RECOMMENDED
+```bash
+python realtime_availability_monitor.py
+```
+- Dynamically extracts datepicker constraints from webpage
+- Monitors only dates from today to last available date
+- **Parallel processing**: Up to 8 concurrent date checks (8x faster than sequential)
+- **Server-friendly**: 0.2s delay per worker, limited to 8 max concurrent connections
+- Supports both A1 and A2 room endpoints
+- Thread-safe statistics and comprehensive real-time logging
+- Saves results to timestamped JSON files
+
+### Run availability scan only (legacy)
 ```python
 # In ajax2py.py, execute the bottom section
 python ajax2py.py
 ```
 
-### Run full automated booking
+### Run full automated booking with browser
 ```python
 # In interactions.py, main() function
 python interactions.py
 ```
 
-### Check specific dates
+### Check specific dates (legacy)
 Modify the date range in `ajax2py.py` line 108:
 ```python
 check_multiple_days_with_times("2025-08-05", "2025-11-30", base_url)
@@ -99,9 +120,21 @@ check_multiple_days_with_times("2025-08-05", "2025-11-30", base_url)
 - Polish month names are mapped to numeric values
 - Results are saved to timestamped JSON files
 
+### Real-time Monitor Features
+- **Dynamic Configuration**: Scrapes `disabledDays`, `minDate`, `maxDate` from webpage JavaScript
+- **Smart Date Range**: Only checks from today to last available date (ignores past dates)
+- **Parallel Processing**: ThreadPoolExecutor with up to 8 workers for concurrent date checking
+- **Server Courtesy**: 0.2s delay per worker, thread-safe request limiting
+- **Performance**: Up to 8x faster than sequential checking while maintaining server friendliness
+- **Comprehensive Logging**: Real-time progress tracking with completion counts and slot detection
+- **Multi-Endpoint Support**: Automatically switches between A1/A2 endpoints based on user choice
+- **Fallback Handling**: Uses reasonable defaults if webpage scraping fails
+- **Thread Safety**: Concurrent statistics tracking with proper locking mechanisms
+
 ## Debugging
 
 - Enable detailed logging by setting logging level to DEBUG
 - Use `playground.ipynb` for testing API interactions
 - Check browser console for JavaScript errors during automation
 - Verify CAPTCHA API credentials if booking fails
+- **Real-time monitor**: All activity is logged in info mode by default - watch console output for detailed parallel checking progress and completion statistics

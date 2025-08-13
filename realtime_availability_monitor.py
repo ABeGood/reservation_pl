@@ -12,6 +12,8 @@ import re
 from datetime import datetime, timedelta
 from ajax2py import parse_time_slots
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 class RealTimeAvailabilityMonitor:
     def __init__(self, page_url="https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A1.php"):
@@ -27,6 +29,7 @@ class RealTimeAvailabilityMonitor:
             'last_check': None,
             'start_time': None
         }
+        self.stats_lock = threading.Lock()
         
     def extract_datepicker_config(self):
         """Dynamically extract datepicker configuration from the web page."""
@@ -119,53 +122,75 @@ class RealTimeAvailabilityMonitor:
         }
         
         try:
+            # Sleep for server courtesy before each request
+            time.sleep(0.2)
+            
             response = requests.post(url, data=data, headers=headers, timeout=10)
             if response.status_code == 200:
                 # Reuse existing parse_time_slots function
                 slots = parse_time_slots(response.text)
-                self.stats['checks_performed'] += 1
-                return slots
+                with self.stats_lock:
+                    self.stats['checks_performed'] += 1
+                return (date_str, slots)
             else:
-                return []
+                return (date_str, [])
         except Exception as e:
-            return []
+            return (date_str, [])
     
     def check_all_dates_once(self):
-        """Single sweep through all available dates."""
+        """Single sweep through all available dates using parallel processing."""
         now = datetime.now().strftime('%H:%M:%S')
-        print(f"[{now}] Checking {len(self.available_dates)} dates...")
+        print(f"[{now}] Checking {len(self.available_dates)} dates in parallel...")
         print(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
         
         new_slots_found = False
-        for i, date_str in enumerate(self.available_dates):
-            if not self.running:
-                break
+        max_workers = min(8, len(self.available_dates))  # Use 8 workers max, or fewer if less dates
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all date checks
+            future_to_date = {
+                executor.submit(self.check_single_date, date_str): date_str 
+                for date_str in self.available_dates
+            }
             
-            print(f"ℹ️  Checking date {date_str} ({i+1}/{len(self.available_dates)})...")
+            completed_count = 0
+            total_dates = len(self.available_dates)
             
-            slots = self.check_single_date(date_str)
-            
-            # Track changes
-            if slots:
-                if date_str not in self.results or self.results[date_str] != slots:
-                    if date_str not in self.results:
-                        print(f"🎉 NEW AVAILABILITY: {date_str} -> {', '.join(slots)}")
-                    else:
-                        print(f"📝 UPDATED: {date_str} -> {', '.join(slots)}")
-                    new_slots_found = True
-                    self.stats['slots_found'] += len(slots)
+            # Process results as they complete
+            for future in as_completed(future_to_date):
+                if not self.running:
+                    break
                 
-                self.results[date_str] = slots
-            else:
-                # Remove if no longer available
-                if date_str in self.results:
-                    print(f"❌ REMOVED: {date_str} (no longer available)")
-                    del self.results[date_str]
-                else:
-                    print(f"   No slots available for {date_str}")
-            time.sleep(0.2)
+                try:
+                    date_str, slots = future.result()
+                    completed_count += 1
+                    
+                    print(f"ℹ️  Completed {date_str} ({completed_count}/{total_dates}) - {len(slots)} slots")
+                    
+                    # Track changes
+                    if slots:
+                        if date_str not in self.results or self.results[date_str] != slots:
+                            if date_str not in self.results:
+                                print(f"🎉 NEW AVAILABILITY: {date_str} -> {', '.join(slots)}")
+                            else:
+                                print(f"📝 UPDATED: {date_str} -> {', '.join(slots)}")
+                            new_slots_found = True
+                            with self.stats_lock:
+                                self.stats['slots_found'] += len(slots)
+                        
+                        self.results[date_str] = slots
+                    else:
+                        # Remove if no longer available
+                        if date_str in self.results:
+                            print(f"❌ REMOVED: {date_str} (no longer available)")
+                            del self.results[date_str]
+                        # Don't print "no slots" for every date to reduce noise
+                
+                except Exception as e:
+                    print(f"❌ Error checking {future_to_date[future]}: {e}")
         
         self.stats['last_check'] = datetime.now().isoformat()
+        print(f"✅ Parallel check completed: {completed_count}/{total_dates} dates processed")
         return new_slots_found
     
     def start_monitoring(self, max_duration_minutes=None):
