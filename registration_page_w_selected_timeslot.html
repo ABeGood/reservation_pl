@@ -1,0 +1,323 @@
+<html>
+
+<head>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="refresh">
+    <link href="style.css" rel="stylesheet" type="text/css">
+
+    <script src="jquery-ui-1.10.4/js/jquery-1.10.2.js"></script>
+    <script src="jquery-ui-1.10.4/js/jquery-ui-1.10.4.custom.js"></script>
+
+    <script src="jquery-ui-1.10.4/js/progression.js"></script>
+
+    <link rel="stylesheet" href="jquery-ui-1.10.4/css/smoothness/jquery-ui-1.10.4.custom.css">
+    <link rel="stylesheet" href="jquery-ui-1.10.4/css/smoothness/progression.css">
+
+
+    <title>Rezerwacja terminu wizyty w WMUW Karta Polaka</title>
+
+    <script>
+        var disabledDays = ["2025-03-25", "2025-04-21", "2025-05-01", "2025-06-01", "2025-06-02", "2025-06-03", "2025-06-04", "2025-06-05", "2025-06-06", "2025-06-07", "2025-06-08", "2025-06-09", "2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13", "2025-06-14", "2025-06-15", "2025-09-01", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-06", "2025-09-07", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-13", "2025-09-14", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-20", "2025-09-21", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-27", "2025-09-28", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-04", "2025-10-05", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-10", "2025-10-11", "2025-10-12", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-18", "2025-10-19", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-25", "2025-10-26", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-01", "2025-11-02", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-08", "2025-11-09", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-15", "2025-11-16", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-22", "2025-11-23", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-27", "2025-11-28", "2025-11-29", "2025-11-30", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-06", "2025-12-07", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-13", "2025-12-14", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-20", "2025-12-21", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-25", "2025-12-26", "2025-12-27", "2025-12-28", "2025-12-29", "2025-12-30", "2025-12-31", "2025-06-21", "2025-06-22", "2025-06-28", "2025-06-29", "2025-07-05", "2025-07-06", "2025-07-12", "2025-07-13", "2025-07-19", "2025-07-20", "2025-07-26", "2025-07-27", "2025-08-02", "2025-08-03", "2025-08-09", "2025-08-10", "2025-08-16", "2025-08-17", "2025-08-23", "2025-08-24", "2025-08-30", "2025-08-31",];
+
+
+        function disableSpecificWeekDays(date) {
+            if ((date.getDay() == 1) || (date.getDay() == 2) || (date.getDay() == 3) || (date.getDay() == 4) || (date.getDay() == 5)) {
+                var string = jQuery.datepicker.formatDate('yy-mm-dd', date);
+                return [disabledDays.indexOf(string) == -1]
+                return [true];
+            } else {
+                return [false];
+            }
+        }
+        $(function () {
+            $('.ui-datepicker').addClass('notranslate');
+            $("#datepicker").datepicker({
+                minDate: new Date("2025/06/16"),
+                maxDate: new Date("2025/08/31"),
+                beforeShowDay: disableSpecificWeekDays,
+            });
+        });
+    </script>
+
+
+
+
+
+    <script><!-
+jQuery(document).ready(function($) {
+
+    $("#for_rezerwacji").progression({
+      tooltipWidth: '200',
+      tooltipPosition: 'right',
+      tooltipOffset: '20',
+      showProgressBar: true,
+      showHelper: true,
+      tooltipFontSize: '13',
+      tooltipFontColor: 'f0f0f0',
+      progressBarBackground: 'fff',
+      progressBarColor: '9fd2f1',
+      tooltipBackgroundColor:'a3a3a3',
+      tooltipPadding: '10',
+      tooltipAnimate: true
+    });
+
+});
+->
+    </script>
+
+</head>
+
+<body style="">
+
+    <div class="tlo"><img src="graf\paszport.png"></div>
+    <div class="tlo_white"></div>
+    <div class="grafika"><a href="rezerwacje.php"><img src="graf\grafika.png"
+                style="width:400px;height:80px;border:0;"></a></div>
+    <div class="naglowek">
+        <i style="position: absolute;top: 10px;left: 50px;">
+            Wydział Spraw Obywatelskich i Cudzoziemców<br>
+            Rezerwacja terminu wizyty</i>
+    </div>
+    <div class="pokoj_A_form"><span><i style="position: relative;top: 10px;">Przedłużenie ważności, wydanie duplikatu,
+                zmiana danych Karty Polaka</i></span></div>
+    <div class="formularz" id="formularz">
+        <form id="for_rezerwacji" action="send.php" method="POST" style="position: relative;">
+            <div class="syco_tooltip" data-tooltip="for_rezerwacji"
+                style="transition: top 0.3s ease-in-out; padding: 10px; top: 395.594px; position: absolute; background: rgb(163, 163, 163); right: -220px; width: 200px;">
+                <span class="triangle_right" style="border-color: transparent #a3a3a3 transparent transparent;"></span>
+                <p style="font-size:13px;color:#f0f0f0"><span class="tooltip_helper"><span
+                            data-index="1">7</span>/8</span> Wybierz datę wizyty z kalendarza oraz sprawdź dostępne
+                    godziny</p>
+                <div class="percentagebar" style="background:#fff" "=""><div class=" percentagebarinner"
+                    style="transition: width 0.3s ease-in-out; background: rgb(159, 210, 241); width: 88%;"></div><span
+                    class="percent">88%</span>
+            </div>
+    </div>
+    <fieldset id="personal">
+
+        <label for="Imię">Imię</label>
+        <input type="text" name="imie" id="imie" maxlength="15" required="" autofocus="" placeholder="pole wymagane"
+            data-progression="" data-helper="Wpisz imię">
+        <label for="nazwisko">Nazwisko</label>
+        <input type="text" name="nazwisko" id="nazwisko" maxlength="20" required="" placeholder="pole wymagane"
+            data-progression="" data-helper="Wpisz nazwiako">
+
+        <label for="obywatelstwo">Obywatelstwo</label>
+        <select id="obywatel" name="obywatelstwo" maxlength="20" required="" placeholder="pole wymagane"
+            data-progression="" data-helper="Wybierz obywatelstwo z listy">
+            <option value="Białoruś">Białoruś</option>
+            <option value="Rosja">Rosja</option>
+            <option value="Ukraina">Ukraina</option>
+            <option value="status bezpaństwowca">status bezpaństwowca</option>
+        </select>
+
+        <label for="email">Adress e-mail</label>
+        <input type="email" name="email" id="email" required="" placeholder="pole wymagane" data-progression=""
+            data-helper=" Wpisz adres e-mail na który wyślemy potwierdzenie rezerwacji">
+        <label for="telefon">Telefon</label>
+        <input type="text" name="telefon" onkeyup="this.value=this.value.replace(/\D/g,'')" id="telefon" required=""
+            placeholder="pole wymagane" data-progression="" data-helper=" Wpisz nr telefonu do kontaktu">
+
+        <label for="rodzaj_wizyty">Kogo dotyczy wniosek</label>
+        <select id="rodzaj" name="rodzaj_wizyty" maxlength="20" required="" placeholder="pole wymagane"
+            data-progression="" data-helper="Wybierz kogo dotyczy wniosek z listy">
+            <option value="osoba dorosła">osoba dorosła</option>
+            <option value="osoba dorosła i małoletnie dzieci">osoba dorosła i małoletnie dzieci</option>
+            <option value="małoletni">małoletni</option>
+        </select>
+
+        <label for="datepicker">Data wizyty</label>
+        <input type="text" name="datepicker" id="datepicker" required="" placeholder="pole wymagane"
+            onclick="zmienna=form['datepicker'].value" data-progression=""
+            data-helper="Wybierz datę wizyty z kalendarza oraz sprawdź dostępne godziny" readonly=""
+            onchange="postStuff();" class="hasDatepicker">
+
+        <span>
+            <div id="class_godzina">
+
+                <link href="style.css" rel="stylesheet" type="text/css">
+
+
+                <div class="radio-zaznacz">
+                    <div class="stanowiskoA">Godzina:<br><input type="radio" id="A209:00" name="godzina" value="A209:00"
+                            class="intro"><label for="A209:00">09:00</label><br></div>
+                </div>
+                <script>
+                    var inputValue = document.getElementById("").id
+                    return document.getElementById(id);
+
+                    var x = document.getElementsByClassName("intro");
+                    'The first paragraph (index 0) with class="intro": ' + x[0].innerHTML;
+                </script>
+
+            </div>
+        </span>
+    </fieldset>
+    <span>
+        <div id="class_data" class="data"></div>
+        <label for="captcha_code">Przepisz kod z obrazka:</label>
+        <div class="captcha">
+            <input type="text" size="10" maxlength="6" name="captcha_code" id="captcha_code" data-progression=""
+                data-helper=" Wpisz nr telefonu do kontaktu">
+            <img style="float: left; padding-right: 5px" id="captcha_image"
+                src="securimage/securimage_show.php?c691da8b7ca113c88234d0eb6065b990" alt="CAPTCHA Image">
+            <a href="#" title="Zmień obraz"
+                onclick="document.getElementById('captcha_image').src = 'securimage/securimage_show.php?' + Math.random(); this.blur(); return false">
+                <img height="32" width="32" src="securimage/images/refresh.png" alt="Zmień obraz" onclick="this.blur()"
+                    style="border: 0px; vertical-align: bottom">
+            </a>
+        </div><a href="#" title="Zmień obraz"
+            onclick="document.getElementById('captcha_image').src = 'securimage/securimage_show.php?' + Math.random(); this.blur(); return false">
+        </a>
+
+
+        <input type="submit" action="" value="Zatwierdź wizytę">
+
+        <script>
+            function postStuff() {
+                var hr = new XMLHttpRequest();
+                var url = "godziny_pokoj_A2.php";
+                var fn = document.getElementById("datepicker").value;
+                var vars = "godzina=" + fn;
+                hr.open("POST", url, true);
+                hr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+
+                hr.onreadystatechange = function () {
+                    console.log(hr);
+
+                    if (hr.readyState == 4 && hr.status == 200) {
+                        var return_data = hr.responseText;
+                        document.getElementById("class_godzina").innerHTML = return_data;
+
+                    }
+                }
+
+                hr.send(vars);
+                document.getElementById("class_godzina").innerHTML = "processing...";
+            }
+
+        </script>
+
+
+        <!-- nowa -->
+
+        <br><br><br>
+        <hr width="285" color="#545454">
+        <a href="Dane osobowe - klauzula informacyjna.pdf" target="_blank"></a>
+        <center><a href="Dane osobowe - klauzula informacyjna.pdf" target="_blank">Dane osobowe - klauzula
+                informacyjna</a>
+            <div id="tabs">
+
+            </div>
+
+        </center>
+    </span></form>
+    </div>
+
+    <div id="ui-datepicker-div" class="ui-datepicker ui-widget ui-widget-content ui-helper-clearfix ui-corner-all"
+        style="position: absolute; top: 625.594px; left: 27px; z-index: 1; display: none;">
+        <div class="ui-datepicker-header ui-widget-header ui-helper-clearfix ui-corner-all"><a
+                class="ui-datepicker-prev ui-corner-all" data-handler="prev" data-event="click"
+                title="&lt;Poprzedni"><span class="ui-icon ui-icon-circle-triangle-w">&lt;Poprzedni</span></a><a
+                class="ui-datepicker-next ui-corner-all ui-state-disabled" title="Następny&gt;"><span
+                    class="ui-icon ui-icon-circle-triangle-e">Następny&gt;</span></a>
+            <div class="ui-datepicker-title"><span class="ui-datepicker-month">Sierpień</span>&nbsp;<span
+                    class="ui-datepicker-year">2025</span></div>
+        </div>
+        <table class="ui-datepicker-calendar">
+            <thead>
+                <tr>
+                    <th><span title="Poniedziałek">Pn</span></th>
+                    <th><span title="Wtorek">Wt</span></th>
+                    <th><span title="Środa">Śr</span></th>
+                    <th><span title="Czwartek">Cz</span></th>
+                    <th><span title="Piątek">Pt</span></th>
+                    <th class="ui-datepicker-week-end"><span title="Sobota">So</span></th>
+                    <th class="ui-datepicker-week-end"><span title="Niedziela">N</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class=" ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td>
+                    <td class=" ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td>
+                    <td class=" ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td>
+                    <td class=" ui-datepicker-other-month ui-datepicker-unselectable ui-state-disabled">&nbsp;</td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">1</a></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">2</span></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">3</span></td>
+                </tr>
+                <tr>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">4</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">5</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">6</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">7</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">8</a></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">9</span></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">10</span></td>
+                </tr>
+                <tr>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">11</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">12</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">13</a></td>
+                    <td class=" ui-datepicker-days-cell-over undefined ui-datepicker-today" data-handler="selectDay"
+                        data-event="click" data-month="7" data-year="2025"><a
+                            class="ui-state-default ui-state-highlight" href="#">14</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">15</a></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">16</span></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">17</span></td>
+                </tr>
+                <tr>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">18</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">19</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">20</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">21</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">22</a></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">23</span></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">24</span></td>
+                </tr>
+                <tr>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">25</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">26</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">27</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">28</a></td>
+                    <td class=" undefined" data-handler="selectDay" data-event="click" data-month="7" data-year="2025">
+                        <a class="ui-state-default" href="#">29</a></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">30</span></td>
+                    <td class=" ui-datepicker-week-end ui-datepicker-unselectable ui-state-disabled undefined"><span
+                            class="ui-state-default">31</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>

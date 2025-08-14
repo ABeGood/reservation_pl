@@ -137,8 +137,9 @@ class RealTimeAvailabilityMonitor:
         except Exception as e:
             return (date_str, [])
     
-    def check_all_dates_once(self):
-        """Single sweep through all available dates using parallel processing."""
+    def get_timeslots(self):
+        """Single sweep through all available dates using parallel processing.
+        Returns structured timeslot data ready for registration process."""
         now = datetime.now().strftime('%H:%M:%S')
         print(f"[{now}] Checking {len(self.available_dates)} dates in parallel...")
         print(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
@@ -191,7 +192,41 @@ class RealTimeAvailabilityMonitor:
         
         self.stats['last_check'] = datetime.now().isoformat()
         print(f"✅ Parallel check completed: {completed_count}/{total_dates} dates processed")
-        return new_slots_found
+        
+        # Return structured data ready for registration
+        registration_ready_slots = []
+        for date_str, slots in self.results.items():
+            for slot in slots:
+                # Extract room identifier from endpoint (A1 or A2)
+                room_id = "A1" if "A1" in self.endpoint else "A2"
+                
+                # Format: Room + time (e.g., "A209:00")
+                timeslot_value = f"{room_id}{slot}"
+                
+                registration_ready_slots.append({
+                    'date': date_str,           # Format: YYYY-MM-DD (for datepicker field)
+                    'time': slot,              # Format: HH:MM
+                    'timeslot_value': timeslot_value,  # Format: A2HH:MM (for godzina radio button)
+                    'room': room_id,           # A1 or A2
+                    'display_text': f"{date_str} at {slot}",
+                    'radio_button': {
+                        'id': timeslot_value,
+                        'name': 'godzina',
+                        'value': timeslot_value
+                    }
+                })
+        
+        return {
+            'slots_found': new_slots_found,
+            'total_available_slots': len(registration_ready_slots),
+            'registration_data': registration_ready_slots,
+            'raw_results': self.results,
+            'stats': {
+                'checks_performed': self.stats['checks_performed'],
+                'dates_checked': completed_count,
+                'last_check': self.stats['last_check']
+            }
+        }
     
     def start_monitoring(self, max_duration_minutes=None):
         """Start continuous monitoring."""
@@ -213,7 +248,7 @@ class RealTimeAvailabilityMonitor:
                 self.available_dates = self.get_available_dates()
                 
                 # Check all dates once
-                self.check_all_dates_once()
+                result = self.get_timeslots()
                 
                 # Show current status
                 self.print_status()
