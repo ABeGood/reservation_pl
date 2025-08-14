@@ -87,10 +87,6 @@ class DatabaseManager:
             reservation VARCHAR(50) NULL REFERENCES reservations(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            registration_date TIMESTAMP NULL,
-            appointment_date VARCHAR(10) NULL,
-            appointment_time VARCHAR(5) NULL,
-            timeslot_value VARCHAR(10) NULL,
             
             -- Constraints
             CONSTRAINT valid_citizenship CHECK (citizenship IN (
@@ -298,18 +294,13 @@ class DatabaseManager:
             logger.error(f"❌ Failed to create reservation: {e}")
             raise
     
-    def assign_reservation_to_registrant(self, registrant_id: int, reservation_id: str,
-                                       appointment_date: str, appointment_time: str, 
-                                       timeslot_value: str) -> bool:
+    def assign_reservation_to_registrant(self, registrant_id: int, reservation_id: str) -> bool:
         """
-        Assign a reservation to a registrant with appointment details.
+        Assign a reservation to a registrant.
         
         Args:
             registrant_id (int): Registrant ID
             reservation_id (str): Reservation ID  
-            appointment_date (str): Appointment date (YYYY-MM-DD)
-            appointment_time (str): Appointment time (HH:MM)
-            timeslot_value (str): Full timeslot value (A1HH:MM or A2HH:MM)
             
         Returns:
             bool: True if update successful, False if registrant not found
@@ -322,10 +313,6 @@ class DatabaseManager:
         update_sql = """
         UPDATE registrants 
         SET reservation = %s,
-            registration_date = %s,
-            appointment_date = %s,
-            appointment_time = %s,
-            timeslot_value = %s,
             updated_at = %s
         WHERE id = %s;
         """
@@ -334,10 +321,6 @@ class DatabaseManager:
             with self.connection.cursor() as cursor:
                 cursor.execute(update_sql, (
                     reservation_id,
-                    datetime.now(),
-                    appointment_date,
-                    appointment_time,
-                    timeslot_value,
                     datetime.now(),
                     registrant_id
                 ))
@@ -502,18 +485,13 @@ def get_pending_registrations(month: Optional[int] = None) -> List[Registrant]:
         return db.get_pending_registrants(desired_month=month)
 
 
-def create_reservation_for_registrant(registrant_id: int, reservation_id: str,
-                                    appointment_date: str, appointment_time: str, 
-                                    timeslot_value: str) -> bool:
+def create_reservation_for_registrant(registrant_id: int, reservation_id: str) -> bool:
     """
     Create a reservation and assign it to a registrant.
     
     Args:
         registrant_id (int): Registrant ID
         reservation_id (str): Unique reservation ID
-        appointment_date (str): Appointment date (YYYY-MM-DD)
-        appointment_time (str): Appointment time (HH:MM)
-        timeslot_value (str): Full timeslot value (A1HH:MM or A2HH:MM)
         
     Returns:
         bool: True if successful
@@ -521,20 +499,23 @@ def create_reservation_for_registrant(registrant_id: int, reservation_id: str,
     with DatabaseManager() as db:
         return db.assign_reservation_to_registrant(
             registrant_id=registrant_id,
-            reservation_id=reservation_id,
-            appointment_date=appointment_date,
-            appointment_time=appointment_time,
-            timeslot_value=timeslot_value
+            reservation_id=reservation_id
         )
 
 
 # Backward compatibility alias
-def mark_as_registered(registrant_id: int, appointment_date: str,
-                      appointment_time: str, timeslot_value: str) -> bool:
+def mark_as_registered(registrant_id: int, appointment_date: str = None,
+                      appointment_time: str = None, timeslot_value: str = None) -> bool:
     """
     Mark a registrant as successfully registered (legacy function).
     Creates a reservation ID automatically.
     
+    Args:
+        registrant_id (int): Registrant ID
+        appointment_date (str, optional): Legacy parameter (ignored)
+        appointment_time (str, optional): Legacy parameter (ignored)
+        timeslot_value (str, optional): Legacy parameter (ignored)
+        
     Returns:
         bool: True if successful
     """
@@ -542,10 +523,7 @@ def mark_as_registered(registrant_id: int, appointment_date: str,
     reservation_id = f"RES_{uuid.uuid4().hex[:8].upper()}"
     return create_reservation_for_registrant(
         registrant_id=registrant_id,
-        reservation_id=reservation_id,
-        appointment_date=appointment_date,
-        appointment_time=appointment_time,
-        timeslot_value=timeslot_value
+        reservation_id=reservation_id
     )
 
 

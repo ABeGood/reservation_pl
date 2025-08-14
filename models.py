@@ -66,10 +66,6 @@ class Registrant:
     id: Optional[int] = None           # Primary key
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    registration_date: Optional[datetime] = None  # When successfully registered
-    appointment_date: Optional[str] = None        # YYYY-MM-DD format
-    appointment_time: Optional[str] = None        # HH:MM format
-    timeslot_value: Optional[str] = None          # A1HH:MM or A2HH:MM format
     
     def __post_init__(self):
         """Validate data after initialization."""
@@ -145,7 +141,6 @@ class Registrant:
             reservation_id (str): ID of the created reservation
         """
         self.reservation = reservation_id
-        self.registration_date = datetime.now()
         self.updated_at = datetime.now()
     
     def is_registered(self) -> bool:
@@ -155,8 +150,7 @@ class Registrant:
     def __str__(self) -> str:
         """String representation for logging and debugging."""
         status = f"✅ Registered (#{self.reservation})" if self.is_registered() else "⏳ Pending"
-        appointment = f" - {self.appointment_date} at {self.appointment_time}" if self.appointment_date else ""
-        return f"{self.name} {self.surname} ({self.citizenship}) - {status}{appointment}"
+        return f"{self.name} {self.surname} ({self.citizenship}) - {status}"
     
     def __repr__(self) -> str:
         """Developer representation."""
