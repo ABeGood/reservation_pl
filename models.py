@@ -4,7 +4,7 @@ Defines registrant data structure and validation.
 """
 
 from dataclasses import dataclass, asdict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -53,10 +53,10 @@ class Registrant:
     # Form fields (from registration_page.html)
     name: str                           # imie - max 15 chars
     surname: str                        # nazwisko - max 20 chars  
-    citizenship: str                    # obywatelstwo - from Citizenship enum
+    citizenship: Citizenship            # obywatelstwo - from Citizenship enum
     email: str                          # email - valid email format
     phone: str                          # telefon - digits only
-    application_type: str               # rodzaj_wizyty - from ApplicationType enum
+    application_type: ApplicationType   # rodzaj_wizyty - from ApplicationType enum
     
     # Additional tracking fields
     desired_month: int                  # Month preference (1-12)
@@ -84,9 +84,8 @@ class Registrant:
             errors.append("Surname is required and must be max 20 characters")
         
         # Citizenship validation
-        valid_citizenships = [c.value for c in Citizenship]
-        if self.citizenship not in valid_citizenships:
-            errors.append(f"Citizenship must be one of: {valid_citizenships}")
+        if not isinstance(self.citizenship, Citizenship):
+            errors.append(f"Citizenship must be a Citizenship enum, got: {type(self.citizenship)}")
         
         # Email validation (basic)
         if not self.email or '@' not in self.email:
@@ -97,9 +96,8 @@ class Registrant:
             errors.append("Phone number is required and must contain only digits")
         
         # Application type validation
-        valid_app_types = [a.value for a in ApplicationType]
-        if self.application_type not in valid_app_types:
-            errors.append(f"Application type must be one of: {valid_app_types}")
+        if not isinstance(self.application_type, ApplicationType):
+            errors.append(f"Application type must be an ApplicationType enum, got: {type(self.application_type)}")
         
         # Desired month validation
         if not (1 <= self.desired_month <= 12):
@@ -118,10 +116,10 @@ class Registrant:
         return {
             'name': self.name,
             'surname': self.surname,
-            'citizenship': self.citizenship,
+            'citizenship': self.citizenship.value,
             'email': self.email,
             'phone': self.phone,
-            'application_type': self.application_type
+            'application_type': self.application_type.value
         }
     
     def to_dict(self) -> dict:
@@ -131,6 +129,31 @@ class Registrant:
     @classmethod
     def from_dict(cls, data: dict) -> 'Registrant':
         """Create Registrant from dictionary data."""
+        # Convert string values to enums if needed
+        if 'citizenship' in data and isinstance(data['citizenship'], str):
+            citizenship_str = data['citizenship']
+            # Try enum key first (e.g., "UKRAINE")
+            try:
+                data['citizenship'] = Citizenship[citizenship_str]
+            except KeyError:
+                # Try enum value (e.g., "Ukraina")
+                for citizenship in Citizenship:
+                    if citizenship.value == citizenship_str:
+                        data['citizenship'] = citizenship
+                        break
+        
+        if 'application_type' in data and isinstance(data['application_type'], str):
+            app_type_str = data['application_type']
+            # Try enum key first (e.g., "ADULT")
+            try:
+                data['application_type'] = ApplicationType[app_type_str]
+            except KeyError:
+                # Try enum value (e.g., "osoba dorosła")
+                for app_type in ApplicationType:
+                    if app_type.value == app_type_str:
+                        data['application_type'] = app_type
+                        break
+        
         return cls(**data)
     
     def set_reservation(self, reservation_id: str):
@@ -150,7 +173,7 @@ class Registrant:
     def __str__(self) -> str:
         """String representation for logging and debugging."""
         status = f"✅ Registered (#{self.reservation})" if self.is_registered() else "⏳ Pending"
-        return f"{self.name} {self.surname} ({self.citizenship}) - {status}"
+        return f"{self.name} {self.surname} ({self.citizenship.value}) - {status}"
     
     def __repr__(self) -> str:
         """Developer representation."""
@@ -166,10 +189,10 @@ def create_registrant(name: str, surname: str, citizenship: str, email: str,
     Args:
         name: First name (max 15 chars)
         surname: Last name (max 20 chars)
-        citizenship: Must be one of Citizenship enum values
+        citizenship: Citizenship string value or Citizenship enum
         email: Valid email address
         phone: Phone number (digits only)
-        application_type: Must be one of ApplicationType enum values
+        application_type: ApplicationType string value or ApplicationType enum
         desired_month: Preferred month (1-12)
     
     Returns:
@@ -178,6 +201,43 @@ def create_registrant(name: str, surname: str, citizenship: str, email: str,
     Raises:
         ValueError: If validation fails
     """
+    # Convert string values to enums
+    if isinstance(citizenship, str):
+        citizenship_enum = None
+        # Try enum key first (e.g., "UKRAINE")
+        try:
+            citizenship_enum = Citizenship[citizenship]
+        except KeyError:
+            # Try enum value (e.g., "Ukraina")
+            for c in Citizenship:
+                if c.value == citizenship:
+                    citizenship_enum = c
+                    break
+        
+        if citizenship_enum is None:
+            valid_keys = [c.name for c in Citizenship]
+            valid_values = [c.value for c in Citizenship]
+            raise ValueError(f"Invalid citizenship: {citizenship}. Must be one of keys: {valid_keys} or values: {valid_values}")
+        citizenship = citizenship_enum
+    
+    if isinstance(application_type, str):
+        app_type_enum = None
+        # Try enum key first (e.g., "ADULT")
+        try:
+            app_type_enum = ApplicationType[application_type]
+        except KeyError:
+            # Try enum value (e.g., "osoba dorosła")
+            for a in ApplicationType:
+                if a.value == application_type:
+                    app_type_enum = a
+                    break
+        
+        if app_type_enum is None:
+            valid_keys = [a.name for a in ApplicationType]
+            valid_values = [a.value for a in ApplicationType]
+            raise ValueError(f"Invalid application type: {application_type}. Must be one of keys: {valid_keys} or values: {valid_values}")
+        application_type = app_type_enum
+    
     return Registrant(
         name=name.strip(),
         surname=surname.strip(),
@@ -199,3 +259,97 @@ def get_citizenship_options() -> list:
 def get_application_type_options() -> list:
     """Get list of valid application type options."""
     return [a.value for a in ApplicationType]
+
+
+def load_registrants_from_json(file_path: str) -> List[Registrant]:
+    """
+    Load registrants from a JSON file.
+    
+    Args:
+        file_path (str): Path to the JSON file
+        
+    Returns:
+        List[Registrant]: List of validated registrant objects
+        
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        ValueError: If JSON is invalid or registrant data is invalid
+        
+    JSON Format:
+    [
+        {
+            "name": "Jan",
+            "surname": "Kowalski",
+            "citizenship": "UKRAINE",  // or "Ukraina"
+            "email": "jan.kowalski@example.com",
+            "phone": "123456789",
+            "application_type": "ADULT",  // or "osoba dorosła"
+            "desired_month": 8
+        },
+        ...
+    ]
+    
+    Note: citizenship and application_type can use either:
+    - Enum keys: "UKRAINE", "RUSSIA", "BELARUS", "STATELESS" / "ADULT", "ADULT_WITH_CHILDREN", "MINOR"
+    - Polish values: "Ukraina", "Rosja", "Białoruś", "status bezpaństwowca" / "osoba dorosła", etc.
+    """
+    import json
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if not isinstance(data, list):
+            raise ValueError("JSON file must contain an array of registrant objects")
+        
+        registrants = []
+        for i, registrant_data in enumerate(data):
+            try:
+                # Create registrant with validation
+                registrant = create_registrant(
+                    name=registrant_data['name'],
+                    surname=registrant_data['surname'],
+                    citizenship=registrant_data['citizenship'],
+                    email=registrant_data['email'],
+                    phone=registrant_data['phone'],
+                    application_type=registrant_data['application_type'],
+                    desired_month=registrant_data['desired_month']
+                )
+                registrants.append(registrant)
+            except KeyError as e:
+                raise ValueError(f"Missing required field {e} in registrant {i+1}")
+            except ValueError as e:
+                raise ValueError(f"Invalid data in registrant {i+1}: {e}")
+        
+        return registrants
+        
+    except FileNotFoundError:
+        raise FileNotFoundError(f"JSON file not found: {file_path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON format: {e}")
+
+
+def save_registrants_to_json(registrants: List[Registrant], file_path: str) -> None:
+    """
+    Save registrants to a JSON file.
+    
+    Args:
+        registrants (List[Registrant]): List of registrants to save
+        file_path (str): Path to the output JSON file
+    """
+    import json
+    
+    data = []
+    for registrant in registrants:
+        data.append({
+            "name": registrant.name,
+            "surname": registrant.surname,
+            "citizenship": registrant.citizenship.value,
+            "email": registrant.email,
+            "phone": registrant.phone,
+            "application_type": registrant.application_type.value,
+            "desired_month": registrant.desired_month
+        })
+    
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
