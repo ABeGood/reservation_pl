@@ -115,6 +115,79 @@ class DatabaseManager:
             self.connection.rollback()
             raise
     
+    def batch_add_registrants(self, registrants: List[Registrant]) -> List[int]:
+        """
+        Add multiple registrants in a specific order with transaction control.
+        
+        Args:
+            registrants (List[Registrant]): List of registrants in desired processing order
+            
+        Returns:
+            List[int]: List of created registrant IDs in the same order
+            
+        Raises:
+            psycopg2.Error: For database errors (rolls back entire batch)
+        """
+        self._ensure_connection()
+        
+        insert_sql = """
+        INSERT INTO registrants (
+            name, surname, citizenship, email, phone, application_type,
+            desired_month, reservation, created_at, updated_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+        ) RETURNING id;
+        """
+        
+        created_ids = []
+        successful_inserts = 0
+        failed_inserts = 0
+        
+        try:
+            with self.connection.cursor() as cursor:
+                for i, registrant in enumerate(registrants, 1):
+                    try:
+                        cursor.execute(insert_sql, (
+                            registrant.name,
+                            registrant.surname,
+                            registrant.citizenship.value,
+                            registrant.email,
+                            registrant.phone,
+                            registrant.application_type.value,
+                            registrant.desired_month,
+                            registrant.reservation,
+                            registrant.created_at or datetime.now(),
+                            registrant.updated_at or datetime.now()
+                        ))
+                        
+                        registrant_id = cursor.fetchone()['id']
+                        created_ids.append(registrant_id)
+                        successful_inserts += 1
+                        logger.info(f"✅ {i}/{len(registrants)}: {registrant.name} {registrant.surname} (ID: {registrant_id})")
+                        
+                    except psycopg2.IntegrityError as e:
+                        failed_inserts += 1
+                        if 'unique_email' in str(e):
+                            logger.error(f"❌ {i}/{len(registrants)}: {registrant.name} {registrant.surname} - Email already exists: {registrant.email}")
+                            created_ids.append(None)  # Keep position for order tracking
+                        else:
+                            logger.error(f"❌ {i}/{len(registrants)}: {registrant.name} {registrant.surname} - Integrity error: {e}")
+                            created_ids.append(None)
+                    except psycopg2.Error as e:
+                        failed_inserts += 1
+                        logger.error(f"❌ {i}/{len(registrants)}: {registrant.name} {registrant.surname} - Database error: {e}")
+                        created_ids.append(None)
+                
+                self.connection.commit()
+                
+                logger.info(f"📊 Batch insert summary: ✅ {successful_inserts} successful, ❌ {failed_inserts} failed")
+                return [id for id in created_ids if id is not None]  # Return only successful IDs
+                
+        except psycopg2.Error as e:
+            self.connection.rollback()
+            logger.error(f"❌ Batch insert failed: {e}")
+            raise
+
     def add_registrant(self, registrant: Registrant) -> int:
         """
         Add a new registrant to the database.
@@ -145,10 +218,10 @@ class DatabaseManager:
                 cursor.execute(insert_sql, (
                     registrant.name,
                     registrant.surname,
-                    registrant.citizenship,
+                    registrant.citizenship.value,
                     registrant.email,
                     registrant.phone,
-                    registrant.application_type,
+                    registrant.application_type.value,
                     registrant.desired_month,
                     registrant.reservation,
                     registrant.created_at or datetime.now(),
@@ -242,14 +315,14 @@ class DatabaseManager:
             select_sql = """
             SELECT * FROM registrants 
             WHERE reservation IS NULL AND desired_month = %s
-            ORDER BY created_at ASC;
+            ORDER BY id ASC;
             """
             params = (desired_month,)
         else:
             select_sql = """
             SELECT * FROM registrants 
             WHERE reservation IS NULL
-            ORDER BY created_at ASC;
+            ORDER BY id ASC;
             """
             params = ()
         
@@ -447,6 +520,42 @@ class DatabaseManager:
 
 
 # Convenience functions for common operations
+def batch_add_new_registrants(registrants_data: List[dict]) -> List[int]:
+    """
+    Add multiple registrants from a list of data dictionaries in specified order.
+    
+    Args:
+        registrants_data (List[dict]): List of registrant data dicts in desired processing order
+        
+    Returns:
+        List[int]: List of created registrant IDs
+        
+    Example:
+        data = [
+            {"name": "Jan", "surname": "Kowalski", "citizenship": "UKRAINE", ...},
+            {"name": "Anna", "surname": "Smith", "citizenship": "RUSSIA", ...}
+        ]
+        ids = batch_add_new_registrants(data)  # Jan gets lower ID (processed first)
+    """
+    from models import create_registrant
+    
+    registrants = []
+    for data in registrants_data:
+        registrant = create_registrant(
+            name=data['name'],
+            surname=data['surname'],
+            citizenship=data['citizenship'],
+            email=data['email'],
+            phone=data['phone'],
+            application_type=data['application_type'],
+            desired_month=data['desired_month']
+        )
+        registrants.append(registrant)
+    
+    with DatabaseManager() as db:
+        return db.batch_add_registrants(registrants)
+
+
 def add_new_registrant(name: str, surname: str, citizenship: str, email: str,
                       phone: str, application_type: str, desired_month: int) -> int:
     """

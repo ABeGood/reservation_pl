@@ -7,7 +7,7 @@ import os
 import logging
 from typing import List, Optional
 from models import load_registrants_from_json, Registrant
-from database import DatabaseManager, add_new_registrant, get_pending_registrations
+from database import DatabaseManager, add_new_registrant, batch_add_new_registrants, get_pending_registrations
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,32 +36,18 @@ def load_mock_registrants_to_db(json_file_path: str = "mock_registrants.json") -
         registrants = load_registrants_from_json(json_file_path)
         print(f"📄 Loaded {len(registrants)} registrants from JSON")
         
-        # Insert into database
-        created_ids = []
-        successful_inserts = 0
-        failed_inserts = 0
-        
+        # Insert into database using batch function (preserves order)
         with DatabaseManager() as db:
-            for i, registrant in enumerate(registrants, 1):
-                try:
-                    registrant_id = db.add_registrant(registrant)
-                    created_ids.append(registrant_id)
-                    successful_inserts += 1
-                    print(f"  ✅ {i}/{len(registrants)}: {registrant.name} {registrant.surname} (ID: {registrant_id})")
-                except ValueError as e:
-                    failed_inserts += 1
-                    if "already exists" in str(e):
-                        print(f"  ⚠️  {i}/{len(registrants)}: {registrant.name} {registrant.surname} - Email already exists")
-                    else:
-                        print(f"  ❌ {i}/{len(registrants)}: {registrant.name} {registrant.surname} - Error: {e}")
-                except Exception as e:
-                    failed_inserts += 1
-                    print(f"  ❌ {i}/{len(registrants)}: {registrant.name} {registrant.surname} - Database error: {e}")
+            created_ids = db.batch_add_registrants(registrants)
+        
+        successful_inserts = len(created_ids)
+        failed_inserts = len(registrants) - successful_inserts
         
         print(f"\n📊 Summary:")
         print(f"  ✅ Successfully inserted: {successful_inserts}")
         print(f"  ❌ Failed inserts: {failed_inserts}")
         print(f"  🆔 Created IDs: {created_ids}")
+        print(f"  📋 Processing order: ID {min(created_ids) if created_ids else 'N/A'} will be processed first")
         
         return created_ids
         
