@@ -1,27 +1,18 @@
 [
   {
-    "name": "Andrij",
-    "surname": "Kovalenko",
-    "citizenship": "UKRAINE",
-    "email": "andrij.kovalenko@email.com",
-    "phone": "123456789",
-    "application_type": "ADULT",
-    "desired_month": 8
-  },
-  {
     "name": "Oksana",
     "surname": "Petrenko",
     "citizenship": "UKRAINE",
-    "email": "oksana.petrenko@email.com",
+    "email": "o.petrenko66@gmail.com",
     "phone": "987654321",
-    "application_type": "ADULT_WITH_CHILDREN",
+    "application_type": "ADULT",
     "desired_month": 9
   },
   {
     "name": "Dmitri",
     "surname": "Volkov",
     "citizenship": "RUSSIA",
-    "email": "dmitri.volkov@email.com",
+    "email": "volkov068d@gmail.com",
     "phone": "555123456",
     "application_type": "ADULT",
     "desired_month": 7
@@ -29,46 +20,10 @@
   {
     "name": "Svetlana",
     "surname": "Ivanova",
-    "citizenship": "RUSSIA",
-    "email": "svetlana.ivanova@email.com",
+    "citizenship": "BELARUS",
+    "email": "griss7473@gmail.com",
     "phone": "555987654",
-    "application_type": "ADULT_WITH_CHILDREN",
-    "desired_month": 8
-  },
-  {
-    "name": "Aliaksandr",
-    "surname": "Lukašenka",
-    "citizenship": "BELARUS",
-    "email": "aliaksandr.lukashenka@email.com",
-    "phone": "777111222",
     "application_type": "ADULT",
-    "desired_month": 10
-  },
-  {
-    "name": "Natallia",
-    "surname": "Smirnova",
-    "citizenship": "BELARUS",
-    "email": "natallia.smirnova@email.com",
-    "phone": "777333444",
-    "application_type": "MINOR",
-    "desired_month": 9
-  },
-  {
-    "name": "Viktor",
-    "surname": "Nowak",
-    "citizenship": "STATELESS",
-    "email": "viktor.nowak@email.com",
-    "phone": "999888777",
-    "application_type": "ADULT",
-    "desired_month": 11
-  },
-  {
-    "name": "Marina",
-    "surname": "Kowalski",
-    "citizenship": "UKRAINE",
-    "email": "marina.kowalski@email.com",
-    "phone": "444555666",
-    "application_type": "ADULT_WITH_CHILDREN",
     "desired_month": 8
   }
 ]

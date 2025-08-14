@@ -14,6 +14,7 @@ from ajax2py import parse_time_slots
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from database import get_pending_registrations
 
 class RealTimeAvailabilityMonitor:
     def __init__(self, page_url="https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A1.php"):
@@ -27,10 +28,54 @@ class RealTimeAvailabilityMonitor:
             'checks_performed': 0,
             'slots_found': 0,
             'last_check': None,
-            'start_time': None
+            'start_time': None,
+            'pending_registrants': 0,
+            'target_months': [],
+            'last_registrant_check': None
         }
         self.stats_lock = threading.Lock()
+        self.pending_registrants = []
+        self.target_months = set()
+        self.last_db_check = None
+        self.db_check_interval = 1800  # Check database every n seconds
         
+    def check_pending_registrants(self):
+        """Check database for pending registrants and update target months."""
+        try:
+            self.pending_registrants = get_pending_registrations()
+            new_target_months = set(r.desired_month for r in self.pending_registrants)
+            
+            # Check if target months changed
+            if new_target_months != self.target_months:
+                print(f"📊 Target months updated: {sorted(new_target_months)} (was: {sorted(self.target_months)})")
+                self.target_months = new_target_months
+                # Clear available_dates to force recalculation
+                self.available_dates = []
+            
+            with self.stats_lock:
+                self.stats['pending_registrants'] = len(self.pending_registrants)
+                self.stats['target_months'] = sorted(list(self.target_months))
+                self.stats['last_registrant_check'] = datetime.now().isoformat()
+            
+            self.last_db_check = datetime.now()
+            
+            print(f"👥 Found {len(self.pending_registrants)} pending registrants for months: {sorted(self.target_months)}")
+            
+            for registrant in self.pending_registrants:
+                print(f"  - {registrant.name} {registrant.surname} (month {registrant.desired_month})")
+            
+            return len(self.pending_registrants) > 0
+            
+        except Exception as e:
+            print(f"❌ Error checking pending registrants: {e}")
+            return len(self.pending_registrants) > 0  # Continue if we had registrants before
+
+    def should_check_database(self):
+        """Check if it's time to refresh registrant data from database."""
+        if not self.last_db_check:
+            return True
+        return (datetime.now() - self.last_db_check).seconds >= self.db_check_interval
+
     def extract_datepicker_config(self):
         """Dynamically extract datepicker configuration from the web page."""
         print(f"🔍 Extracting datepicker configuration from {self.page_url}...")
@@ -85,7 +130,11 @@ class RealTimeAvailabilityMonitor:
             }
     
     def get_available_dates(self):
-        """Get available dates from today to the last available in datepicker."""
+        """Get available dates filtered by registrant desired months."""
+        if not self.target_months:
+            print("⏸️  No target months - no pending registrants")
+            return []
+            
         config = self.extract_datepicker_config()
         available_dates = []
         
@@ -95,18 +144,21 @@ class RealTimeAvailabilityMonitor:
         current_date = datetime.combine(current_date, datetime.min.time())  # Convert back to datetime
         
         print(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
+        print(f"🎯 Filtering for target months: {sorted(self.target_months)}")
         
         while current_date <= config['max_date']:
             date_str = current_date.strftime("%Y-%m-%d")
             
-            # Only weekdays (Monday=0 to Friday=4)
-            if current_date.weekday() < 5 and date_str not in config['disabled_days']:
+            # Only weekdays (Monday=0 to Friday=4) in target months
+            if (current_date.weekday() < 5 and 
+                date_str not in config['disabled_days'] and
+                current_date.month in self.target_months):
                 available_dates.append(date_str)
             
             current_date += timedelta(days=1)
         
         print(f"ℹ️  Days to check: {', '.join(available_dates[:10])}{'...' if len(available_dates) > 10 else ''}")
-        print(f"✅ Found {len(available_dates)} potentially available dates")
+        print(f"✅ Found {len(available_dates)} potentially available dates in target months")
         return available_dates
     
     def check_single_date(self, date_str):
@@ -141,6 +193,22 @@ class RealTimeAvailabilityMonitor:
         """Single sweep through all available dates using parallel processing.
         Returns structured timeslot data ready for registration process."""
         now = datetime.now().strftime('%H:%M:%S')
+        
+        # Skip server calls if no available dates
+        if not self.available_dates:
+            print(f"[{now}] ⏸️  No dates to check - skipping server calls")
+            return {
+                'slots_found': False,
+                'total_available_slots': 0,
+                'registration_data': [],
+                'raw_results': {},
+                'stats': {
+                    'checks_performed': self.stats['checks_performed'],
+                    'dates_checked': 0,
+                    'last_check': datetime.now().isoformat()
+                }
+            }
+        
         print(f"[{now}] Checking {len(self.available_dates)} dates in parallel...")
         print(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
         
@@ -229,25 +297,49 @@ class RealTimeAvailabilityMonitor:
         }
     
     def start_monitoring(self, max_duration_minutes=None):
-        """Start continuous monitoring."""
-        print("🚀 Starting real-time availability monitoring...")
+        """Start continuous monitoring with database-aware smart scheduling."""
+        print("🚀 Starting smart real-time availability monitoring...")
         print(f"Monitoring endpoint: {self.base_url}{self.endpoint}")
+        print("📊 Database integration: ✅ Enabled")
+        print("🎯 Smart scheduling: Only monitors months with pending registrants")
+        print("⏸️  Auto-pause: Stops server calls when no pending registrants")
         print("Press Ctrl+C to stop\n")
         
         self.running = True
         self.stats['start_time'] = datetime.now().isoformat()
         
+        # Initial registrant check
+        has_registrants = self.check_pending_registrants()
+        if not has_registrants:
+            print("⚠️  No pending registrants found. Monitoring will wait for registrants...")
+        
         try:
             start_time = time.time()
             cycle_count = 0
+            wait_cycles = 0
             
             while self.running:
                 cycle_count += 1
                 cycle_start = time.time()
 
+                # Check database for new/removed registrants periodically
+                if self.should_check_database():
+                    has_registrants = self.check_pending_registrants()
+                    if not has_registrants:
+                        wait_cycles += 1
+                        if wait_cycles == 1:
+                            print("⏸️  No pending registrants - entering standby mode")
+                        print(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
+                        time.sleep(self.db_check_interval)
+                        continue
+                    elif wait_cycles > 0:
+                        print("🎉 Found pending registrants - resuming active monitoring!")
+                        wait_cycles = 0
+
+                # Get available dates (filtered by target months)
                 self.available_dates = self.get_available_dates()
                 
-                # Check all dates once
+                # Check dates (will skip server calls if no dates)
                 result = self.get_timeslots()
                 
                 # Show current status
@@ -260,10 +352,15 @@ class RealTimeAvailabilityMonitor:
                         print(f"\n⏰ Stopping after {max_duration_minutes} minutes")
                         break
                 
-                # Wait before next cycle (additional 2-5 seconds between full cycles)
+                # Adaptive wait time based on results
                 cycle_duration = time.time() - cycle_start
-                additional_wait = 0.3
-                print(f"Cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s before next cycle...\n")
+                if result['total_available_slots'] > 0:
+                    additional_wait = 0.3  # Quick check when slots found
+                    print(f"🔥 Slots available! Quick cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s...")
+                else:
+                    additional_wait = 2.0  # Longer wait when no slots
+                    print(f"Cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s before next cycle...")
+                
                 time.sleep(additional_wait)
                 
         except KeyboardInterrupt:
@@ -273,19 +370,26 @@ class RealTimeAvailabilityMonitor:
             self.save_results()
     
     def print_status(self):
-        """Print current monitoring status."""
+        """Print current monitoring status with registrant information."""
         now = datetime.now().strftime('%H:%M:%S')
         available_count = len(self.results)
         total_slots = sum(len(slots) for slots in self.results.values())
+        pending_count = len(self.pending_registrants)
         
-        print(f"[{now}] Status: {available_count} dates with slots, {total_slots} total slots, {self.stats['checks_performed']} checks performed")
+        print(f"[{now}] Status: {available_count} dates with slots, {total_slots} total slots, {pending_count} pending registrants")
+        print(f"🎯 Target months: {sorted(self.target_months) if self.target_months else 'None'} | Server checks: {self.stats['checks_performed']}")
         
         if self.results:
             print("Current availability:")
             for date_str, slots in sorted(self.results.items()):
-                print(f"  📅 {date_str}: {', '.join(slots)}")
+                month = datetime.strptime(date_str, "%Y-%m-%d").month
+                matching_registrants = [r for r in self.pending_registrants if r.desired_month == month]
+                print(f"  📅 {date_str}: {', '.join(slots)} → {len(matching_registrants)} registrants interested")
         else:
-            print("  ❌ No slots currently available")
+            if self.target_months:
+                print("  ❌ No slots currently available in target months")
+            else:
+                print("  ⏸️  No target months - no pending registrants")
     
     def save_results(self):
         """Save current results to file."""
