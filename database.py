@@ -12,7 +12,7 @@ from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2 import sql
 from dotenv import load_dotenv
 
-from models import Registrant
+from models import Registrant, Reservation
 
 # Load environment variables
 load_dotenv()
@@ -64,10 +64,17 @@ class DatabaseManager:
             self.connect()
     
     def _ensure_table_exists(self):
-        """Create registrants table if it doesn't exist."""
+        """Create registrants and reservations tables if they don't exist."""
         self._ensure_connection()
         
-        create_table_sql = """
+        create_tables_sql = """
+        -- Create reservations table first (referenced by registrants)
+        CREATE TABLE IF NOT EXISTS reservations (
+            id VARCHAR(50) PRIMARY KEY
+            -- Additional fields will be added later
+        );
+        
+        -- Create registrants table
         CREATE TABLE IF NOT EXISTS registrants (
             id SERIAL PRIMARY KEY,
             name VARCHAR(15) NOT NULL,
@@ -77,7 +84,7 @@ class DatabaseManager:
             phone VARCHAR(20) NOT NULL,
             application_type VARCHAR(100) NOT NULL,
             desired_month INTEGER NOT NULL CHECK (desired_month BETWEEN 1 AND 12),
-            registered BOOLEAN DEFAULT FALSE,
+            reservation VARCHAR(50) NULL REFERENCES reservations(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             registration_date TIMESTAMP NULL,
@@ -95,21 +102,18 @@ class DatabaseManager:
             CONSTRAINT unique_email UNIQUE (email)
         );
         
-        -- Create index on email for faster lookups
+        -- Create indexes for performance
         CREATE INDEX IF NOT EXISTS idx_registrants_email ON registrants(email);
-        
-        -- Create index on registration status
-        CREATE INDEX IF NOT EXISTS idx_registrants_registered ON registrants(registered);
-        
-        -- Create index on desired month for filtering
+        CREATE INDEX IF NOT EXISTS idx_registrants_reservation ON registrants(reservation);
         CREATE INDEX IF NOT EXISTS idx_registrants_desired_month ON registrants(desired_month);
+        CREATE INDEX IF NOT EXISTS idx_registrants_reservation_null ON registrants(reservation) WHERE reservation IS NULL;
         """
         
         try:
             with self.connection.cursor() as cursor:
-                cursor.execute(create_table_sql)
+                cursor.execute(create_tables_sql)
                 self.connection.commit()
-                logger.info("✅ Registrants table ready")
+                logger.info("✅ Registrants and Reservations tables ready")
         except psycopg2.Error as e:
             logger.error(f"❌ Table creation failed: {e}")
             self.connection.rollback()
@@ -134,7 +138,7 @@ class DatabaseManager:
         insert_sql = """
         INSERT INTO registrants (
             name, surname, citizenship, email, phone, application_type,
-            desired_month, registered, created_at, updated_at
+            desired_month, reservation, created_at, updated_at
         ) VALUES (
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         ) RETURNING id;
@@ -150,7 +154,7 @@ class DatabaseManager:
                     registrant.phone,
                     registrant.application_type,
                     registrant.desired_month,
-                    registrant.registered,
+                    registrant.reservation,
                     registrant.created_at or datetime.now(),
                     registrant.updated_at or datetime.now()
                 ))
@@ -226,29 +230,29 @@ class DatabaseManager:
             logger.error(f"❌ Failed to get registrant by email {email}: {e}")
             raise
     
-    def get_unregistered_registrants(self, desired_month: Optional[int] = None) -> List[Registrant]:
+    def get_pending_registrants(self, desired_month: Optional[int] = None) -> List[Registrant]:
         """
-        Get all unregistered registrants, optionally filtered by desired month.
+        Get all pending registrants (without reservations), optionally filtered by desired month.
         
         Args:
             desired_month (Optional[int]): Filter by desired month (1-12)
             
         Returns:
-            List[Registrant]: List of unregistered registrants
+            List[Registrant]: List of pending registrants
         """
         self._ensure_connection()
         
         if desired_month:
             select_sql = """
             SELECT * FROM registrants 
-            WHERE registered = FALSE AND desired_month = %s
+            WHERE reservation IS NULL AND desired_month = %s
             ORDER BY created_at ASC;
             """
             params = (desired_month,)
         else:
             select_sql = """
             SELECT * FROM registrants 
-            WHERE registered = FALSE
+            WHERE reservation IS NULL
             ORDER BY created_at ASC;
             """
             params = ()
@@ -261,16 +265,48 @@ class DatabaseManager:
                 return [Registrant.from_dict(dict(row)) for row in rows]
                 
         except psycopg2.Error as e:
-            logger.error(f"❌ Failed to get unregistered registrants: {e}")
+            logger.error(f"❌ Failed to get pending registrants: {e}")
             raise
     
-    def update_registration_status(self, registrant_id: int, appointment_date: str, 
-                                 appointment_time: str, timeslot_value: str) -> bool:
+    def create_reservation(self, reservation_id: str) -> bool:
         """
-        Mark registrant as successfully registered with appointment details.
+        Create a new reservation record.
+        
+        Args:
+            reservation_id (str): Unique reservation ID
+            
+        Returns:
+            bool: True if created successfully
+        """
+        self._ensure_connection()
+        
+        insert_sql = "INSERT INTO reservations (id) VALUES (%s);"
+        
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(insert_sql, (reservation_id,))
+                self.connection.commit()
+                logger.info(f"✅ Created reservation: {reservation_id}")
+                return True
+                
+        except psycopg2.IntegrityError:
+            self.connection.rollback()
+            logger.warning(f"⚠️  Reservation {reservation_id} already exists")
+            return False
+        except psycopg2.Error as e:
+            self.connection.rollback()
+            logger.error(f"❌ Failed to create reservation: {e}")
+            raise
+    
+    def assign_reservation_to_registrant(self, registrant_id: int, reservation_id: str,
+                                       appointment_date: str, appointment_time: str, 
+                                       timeslot_value: str) -> bool:
+        """
+        Assign a reservation to a registrant with appointment details.
         
         Args:
             registrant_id (int): Registrant ID
+            reservation_id (str): Reservation ID  
             appointment_date (str): Appointment date (YYYY-MM-DD)
             appointment_time (str): Appointment time (HH:MM)
             timeslot_value (str): Full timeslot value (A1HH:MM or A2HH:MM)
@@ -280,9 +316,12 @@ class DatabaseManager:
         """
         self._ensure_connection()
         
+        # First ensure reservation exists
+        self.create_reservation(reservation_id)
+        
         update_sql = """
         UPDATE registrants 
-        SET registered = TRUE,
+        SET reservation = %s,
             registration_date = %s,
             appointment_date = %s,
             appointment_time = %s,
@@ -294,6 +333,7 @@ class DatabaseManager:
         try:
             with self.connection.cursor() as cursor:
                 cursor.execute(update_sql, (
+                    reservation_id,
                     datetime.now(),
                     appointment_date,
                     appointment_time,
@@ -306,15 +346,15 @@ class DatabaseManager:
                 self.connection.commit()
                 
                 if updated:
-                    logger.info(f"✅ Updated registration status for registrant ID {registrant_id}")
+                    logger.info(f"✅ Assigned reservation {reservation_id} to registrant ID {registrant_id}")
                 else:
-                    logger.warning(f"⚠️  Registrant ID {registrant_id} not found for update")
+                    logger.warning(f"⚠️  Registrant ID {registrant_id} not found for reservation assignment")
                 
                 return updated
                 
         except psycopg2.Error as e:
             self.connection.rollback()
-            logger.error(f"❌ Failed to update registration status: {e}")
+            logger.error(f"❌ Failed to assign reservation: {e}")
             raise
     
     def delete_registrant(self, registrant_id: int) -> bool:
@@ -362,8 +402,8 @@ class DatabaseManager:
         stats_sql = """
         SELECT 
             COUNT(*) as total_registrants,
-            COUNT(*) FILTER (WHERE registered = TRUE) as registered_count,
-            COUNT(*) FILTER (WHERE registered = FALSE) as pending_count,
+            COUNT(*) FILTER (WHERE reservation IS NOT NULL) as registered_count,
+            COUNT(*) FILTER (WHERE reservation IS NULL) as pending_count,
             COUNT(DISTINCT citizenship) as unique_citizenships,
             COUNT(DISTINCT desired_month) as months_requested
         FROM registrants;
@@ -371,7 +411,7 @@ class DatabaseManager:
         
         citizenship_sql = """
         SELECT citizenship, COUNT(*) as count, 
-               COUNT(*) FILTER (WHERE registered = TRUE) as registered
+               COUNT(*) FILTER (WHERE reservation IS NOT NULL) as registered
         FROM registrants 
         GROUP BY citizenship 
         ORDER BY count DESC;
@@ -379,7 +419,7 @@ class DatabaseManager:
         
         month_sql = """
         SELECT desired_month, COUNT(*) as count,
-               COUNT(*) FILTER (WHERE registered = TRUE) as registered
+               COUNT(*) FILTER (WHERE reservation IS NOT NULL) as registered
         FROM registrants 
         GROUP BY desired_month 
         ORDER BY desired_month;
@@ -450,7 +490,7 @@ def add_new_registrant(name: str, surname: str, citizenship: str, email: str,
 
 def get_pending_registrations(month: Optional[int] = None) -> List[Registrant]:
     """
-    Get all pending registrations, optionally for a specific month.
+    Get all pending registrations (without reservations), optionally for a specific month.
     
     Args:
         month (Optional[int]): Filter by desired month (1-12)
@@ -459,24 +499,54 @@ def get_pending_registrations(month: Optional[int] = None) -> List[Registrant]:
         List[Registrant]: Pending registrants
     """
     with DatabaseManager() as db:
-        return db.get_unregistered_registrants(desired_month=month)
+        return db.get_pending_registrants(desired_month=month)
 
 
-def mark_as_registered(registrant_id: int, appointment_date: str,
-                      appointment_time: str, timeslot_value: str) -> bool:
+def create_reservation_for_registrant(registrant_id: int, reservation_id: str,
+                                    appointment_date: str, appointment_time: str, 
+                                    timeslot_value: str) -> bool:
     """
-    Mark a registrant as successfully registered.
+    Create a reservation and assign it to a registrant.
     
+    Args:
+        registrant_id (int): Registrant ID
+        reservation_id (str): Unique reservation ID
+        appointment_date (str): Appointment date (YYYY-MM-DD)
+        appointment_time (str): Appointment time (HH:MM)
+        timeslot_value (str): Full timeslot value (A1HH:MM or A2HH:MM)
+        
     Returns:
         bool: True if successful
     """
     with DatabaseManager() as db:
-        return db.update_registration_status(
+        return db.assign_reservation_to_registrant(
             registrant_id=registrant_id,
+            reservation_id=reservation_id,
             appointment_date=appointment_date,
             appointment_time=appointment_time,
             timeslot_value=timeslot_value
         )
+
+
+# Backward compatibility alias
+def mark_as_registered(registrant_id: int, appointment_date: str,
+                      appointment_time: str, timeslot_value: str) -> bool:
+    """
+    Mark a registrant as successfully registered (legacy function).
+    Creates a reservation ID automatically.
+    
+    Returns:
+        bool: True if successful
+    """
+    import uuid
+    reservation_id = f"RES_{uuid.uuid4().hex[:8].upper()}"
+    return create_reservation_for_registrant(
+        registrant_id=registrant_id,
+        reservation_id=reservation_id,
+        appointment_date=appointment_date,
+        appointment_time=appointment_time,
+        timeslot_value=timeslot_value
+    )
 
 
 if __name__ == "__main__":

@@ -9,6 +9,25 @@ from datetime import datetime
 from enum import Enum
 
 
+@dataclass
+class Reservation:
+    """
+    Data model for a reservation in the Polish Card appointment system.
+    
+    Contains reservation details and appointment information.
+    """
+    # Primary identifier
+    id: Optional[str] = None           # Reservation ID (will be expanded later)
+    
+    # Database fields (to be added later)
+    # created_at: Optional[datetime] = None
+    # appointment_date: Optional[str] = None
+    # appointment_time: Optional[str] = None
+    # timeslot_value: Optional[str] = None
+    # status: Optional[str] = None
+    # ... other reservation fields
+
+
 class Citizenship(Enum):
     """Valid citizenship options from registration form."""
     BELARUS = "Białoruś"
@@ -41,7 +60,7 @@ class Registrant:
     
     # Additional tracking fields
     desired_month: int                  # Month preference (1-12)
-    registered: bool = False            # Registration completion status
+    reservation: Optional[str] = None   # Reservation ID if registered, None if pending
     
     # Database fields
     id: Optional[int] = None           # Primary key
@@ -118,31 +137,30 @@ class Registrant:
         """Create Registrant from dictionary data."""
         return cls(**data)
     
-    def set_appointment(self, date: str, time: str, timeslot_value: str):
+    def set_reservation(self, reservation_id: str):
         """
-        Set appointment details when registration is successful.
+        Set reservation ID when registration is successful.
         
         Args:
-            date (str): Appointment date in YYYY-MM-DD format
-            time (str): Appointment time in HH:MM format  
-            timeslot_value (str): Full timeslot value (A1HH:MM or A2HH:MM)
+            reservation_id (str): ID of the created reservation
         """
-        self.appointment_date = date
-        self.appointment_time = time
-        self.timeslot_value = timeslot_value
-        self.registered = True
+        self.reservation = reservation_id
         self.registration_date = datetime.now()
         self.updated_at = datetime.now()
     
+    def is_registered(self) -> bool:
+        """Check if registrant has a reservation."""
+        return self.reservation is not None
+    
     def __str__(self) -> str:
         """String representation for logging and debugging."""
-        status = "✅ Registered" if self.registered else "⏳ Pending"
-        appointment = f" - {self.appointment_date} at {self.appointment_time}" if self.registered else ""
+        status = f"✅ Registered (#{self.reservation})" if self.is_registered() else "⏳ Pending"
+        appointment = f" - {self.appointment_date} at {self.appointment_time}" if self.appointment_date else ""
         return f"{self.name} {self.surname} ({self.citizenship}) - {status}{appointment}"
     
     def __repr__(self) -> str:
         """Developer representation."""
-        return f"Registrant(id={self.id}, name='{self.name}', surname='{self.surname}', registered={self.registered})"
+        return f"Registrant(id={self.id}, name='{self.name}', surname='{self.surname}', reservation={self.reservation})"
 
 
 # Helper functions for creating registrants
