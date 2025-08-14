@@ -105,6 +105,44 @@ def test_database_operations():
         raise
 
 
+def delete_tables():
+    """
+    Delete all tables from the database (registrants and reservations).
+    
+    WARNING: This will permanently delete ALL data in the database!
+    """
+    print("⚠️  WARNING: This will DELETE ALL TABLES and DATA!")
+    confirm = input("Type 'DELETE ALL TABLES' to confirm: ").strip()
+    
+    if confirm != 'DELETE ALL TABLES':
+        print("❌ Operation cancelled - confirmation text did not match")
+        return False
+    
+    print("\n🗑️  Deleting all tables...")
+    
+    try:
+        with DatabaseManager() as db:
+            db._ensure_connection()
+            
+            drop_tables_sql = """
+            -- Drop tables in reverse order due to foreign key constraints
+            DROP TABLE IF EXISTS registrants CASCADE;
+            DROP TABLE IF EXISTS reservations CASCADE;
+            """
+            
+            with db.connection.cursor() as cursor:
+                cursor.execute(drop_tables_sql)
+                db.connection.commit()
+                
+            print("✅ All tables deleted successfully")
+            print("ℹ️  Tables will be recreated automatically on next database operation")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Failed to delete tables: {e}")
+        raise
+
+
 def cleanup_test_data(registrant_ids: List[int]):
     """
     Clean up test data by removing registrants with given IDs.
@@ -195,11 +233,71 @@ def verify_json_format(json_file_path: str = "mock_registrants.json"):
         raise
 
 
+def interactive_menu():
+    """
+    Interactive menu for database testing operations.
+    """
+    print("🚀 Database Test Suite - Interactive Mode")
+    print("=" * 60)
+    
+    # Check environment setup
+    if not os.getenv('DATABASE_URL'):
+        print("⚠️  DATABASE_URL not found in environment")
+        print("   Please add DATABASE_URL to your .env file")
+        print("   Example: DATABASE_URL=postgresql://user:pass@host:port/dbname")
+        return
+    
+    while True:
+        print("\n📋 Available Operations:")
+        print("1. 🔍 Verify JSON format")
+        print("2. 🧪 Test database operations")
+        print("3. 📄 Load mock registrants from JSON")
+        print("4. 🧹 Clean up test data (by IDs)")
+        print("5. 🗑️  DELETE ALL TABLES (DANGER!)")
+        print("6. 🔄 Run full test suite")
+        print("0. ❌ Exit")
+        
+        choice = input("\nSelect operation (0-6): ").strip()
+        
+        try:
+            if choice == '0':
+                print("👋 Goodbye!")
+                break
+            elif choice == '1':
+                verify_json_format()
+            elif choice == '2':
+                test_database_operations()
+            elif choice == '3':
+                created_ids = load_mock_registrants_to_db()
+                print(f"ℹ️  Created registrant IDs: {created_ids}")
+            elif choice == '4':
+                ids_input = input("Enter registrant IDs to delete (comma-separated): ").strip()
+                if ids_input:
+                    try:
+                        ids = [int(x.strip()) for x in ids_input.split(',')]
+                        cleanup_test_data(ids)
+                    except ValueError:
+                        print("❌ Invalid ID format. Please enter comma-separated numbers.")
+                else:
+                    print("❌ No IDs provided")
+            elif choice == '5':
+                delete_tables()
+            elif choice == '6':
+                main()
+                break
+            else:
+                print("❌ Invalid choice. Please select 0-6.")
+                
+        except Exception as e:
+            print(f"❌ Operation failed: {e}")
+            continue
+
+
 def main():
     """
-    Main function to run all tests.
+    Main function to run full test suite.
     """
-    print("🚀 Database Test Suite")
+    print("🚀 Database Test Suite - Full Run")
     print("=" * 60)
     
     # Check environment setup
@@ -242,4 +340,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Run interactive menu by default, or full test suite with --full argument
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == '--full':
+        main()
+    else:
+        interactive_menu()
