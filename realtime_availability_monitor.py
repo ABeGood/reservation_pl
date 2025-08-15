@@ -14,7 +14,10 @@ from ajax2py import parse_time_slots
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
-from database import get_pending_registrations
+from database import get_pending_registrations, create_reservation_for_registrant
+from ajax2py import send_registration_request, get_session_id
+from capcha import solve_base64
+import base64
 
 class RealTimeAvailabilityMonitor:
     def __init__(self, page_url="https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A1.php"):
@@ -31,7 +34,9 @@ class RealTimeAvailabilityMonitor:
             'start_time': None,
             'pending_registrants': 0,
             'target_months': [],
-            'last_registrant_check': None
+            'last_registrant_check': None,
+            'successful_registrations': 0,
+            'registration_attempts': 0
         }
         self.stats_lock = threading.Lock()
         self.pending_registrants = []
@@ -39,6 +44,155 @@ class RealTimeAvailabilityMonitor:
         self.last_db_check = None
         self.db_check_interval = 1800  # Check database every n seconds
         
+    def get_captcha_image(self, session_id=None):
+        """Fetch CAPTCHA image from server and return as base64 string."""
+        captcha_url = f"{self.base_url}securimage/securimage_show.php"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': self.base_url
+        }
+        
+        cookies = {'PHPSESSID': session_id} if session_id else {}
+        
+        try:
+            response = requests.get(captcha_url, headers=headers, cookies=cookies, timeout=10)
+            if response.status_code == 200:
+                # Convert image to base64
+                captcha_base64 = base64.b64encode(response.content).decode('ascii')
+                return captcha_base64, response.cookies.get('PHPSESSID', session_id)
+            else:
+                print(f"❌ Failed to fetch CAPTCHA: HTTP {response.status_code}")
+                return None, None
+        except Exception as e:
+            print(f"❌ CAPTCHA fetch error: {e}")
+            return None, None
+
+    def attempt_auto_registration(self, available_slots):
+        """
+        Attempt automatic registration for available slots.
+        Matches slots to registrants by month and attempts registration.
+        
+        Args:
+            available_slots (list): List of slot dictionaries from get_timeslots()
+            
+        Returns:
+            list: List of successful registration results
+        """
+        if not available_slots or not self.pending_registrants:
+            return []
+        
+        successful_registrations = []
+        
+        print(f"🎯 Attempting auto-registration for {len(available_slots)} available slots...")
+        
+        for slot in available_slots:
+            slot_date = slot['date']  # YYYY-MM-DD format
+            slot_month = datetime.strptime(slot_date, "%Y-%m-%d").month
+            
+            # Find first pending registrant for this month (ID order = priority order)
+            matching_registrant = None
+            for registrant in sorted(self.pending_registrants, key=lambda r: r.id):
+                if registrant.desired_month == slot_month:
+                    matching_registrant = registrant
+                    break
+            
+            if not matching_registrant:
+                print(f"⏭️  No matching registrant for {slot_date} (month {slot_month})")
+                continue
+                
+            print(f"🎯 Attempting registration: {matching_registrant.name} {matching_registrant.surname} → {slot['display_text']}")
+            
+            try:
+                # Step 1: Get session and CAPTCHA
+                session_id = get_session_id(self.base_url)
+                if not session_id:
+                    print(f"❌ Failed to get session ID")
+                    continue
+                
+                captcha_base64, session_id = self.get_captcha_image(session_id)
+                if not captcha_base64:
+                    print(f"❌ Failed to get CAPTCHA image")
+                    continue
+                
+                # Step 2: Solve CAPTCHA
+                captcha_result = solve_base64(captcha_base64)
+                if not captcha_result.get('result'):
+                    print(f"❌ CAPTCHA solving failed: {captcha_result}")
+                    continue
+                    
+                captcha_code = captcha_result['result']
+                print(f"🔍 CAPTCHA solved: {captcha_code}")
+                
+                # Step 3: Prepare registration data
+                registrant_data = matching_registrant.to_registration_data()
+                timeslot_data = {
+                    'date': slot['date'],
+                    'timeslot_value': slot['timeslot_value']
+                }
+                
+                # Step 4: Send registration request
+                print(f"📤 Sending registration request...")
+                registration_result = send_registration_request(
+                    base_url=self.base_url,
+                    registrant_data=registrant_data,
+                    timeslot_data=timeslot_data,
+                    captcha_code=captcha_code,
+                    session_id=session_id
+                )
+                
+                # Step 5: Process result
+                if registration_result.get('success'):
+                    # Generate reservation ID and update database
+                    import uuid
+                    reservation_id = f"AUTO_{uuid.uuid4().hex[:8].upper()}"
+                    
+                    success = create_reservation_for_registrant(
+                        registrant_id=matching_registrant.id,
+                        reservation_id=reservation_id
+                    )
+                    
+                    if success:
+                        print(f"✅ REGISTRATION SUCCESS: {matching_registrant.name} {matching_registrant.surname}")
+                        print(f"   📅 Slot: {slot['display_text']}")
+                        print(f"   🆔 Reservation: {reservation_id}")
+                        
+                        successful_registrations.append({
+                            'registrant_id': matching_registrant.id,
+                            'registrant_name': f"{matching_registrant.name} {matching_registrant.surname}",
+                            'reservation_id': reservation_id,
+                            'slot_info': slot,
+                            'registration_result': registration_result
+                        })
+                        
+                        # Remove from pending list to avoid re-attempts
+                        self.pending_registrants = [r for r in self.pending_registrants if r.id != matching_registrant.id]
+                        
+                        # Update target months after removing registrant
+                        self.target_months = set(r.desired_month for r in self.pending_registrants)
+                        
+                    else:
+                        print(f"❌ Database update failed for {matching_registrant.name}")
+                        
+                else:
+                    print(f"❌ Registration failed: {registration_result.get('message', 'Unknown error')}")
+                    
+                # Be nice to server between attempts
+                time.sleep(2)
+                
+            except Exception as e:
+                print(f"❌ Registration error for {matching_registrant.name}: {e}")
+                continue
+        
+        if successful_registrations:
+            print(f"🎉 AUTO-REGISTRATION SUMMARY: {len(successful_registrations)} successful registrations!")
+            with self.stats_lock:
+                self.stats['successful_registrations'] = self.stats.get('successful_registrations', 0) + len(successful_registrations)
+        else:
+            print("ℹ️  No successful registrations in this attempt")
+            
+        return successful_registrations
+
     def check_pending_registrants(self):
         """Check database for pending registrants and update target months."""
         try:
@@ -298,11 +452,13 @@ class RealTimeAvailabilityMonitor:
     
     def start_monitoring(self, max_duration_minutes=None):
         """Start continuous monitoring with database-aware smart scheduling."""
-        print("🚀 Starting smart real-time availability monitoring...")
+        print("🚀 Starting smart real-time availability monitoring with AUTO-REGISTRATION...")
         print(f"Monitoring endpoint: {self.base_url}{self.endpoint}")
         print("📊 Database integration: ✅ Enabled")
         print("🎯 Smart scheduling: Only monitors months with pending registrants")
         print("⏸️  Auto-pause: Stops server calls when no pending registrants")
+        print("🤖 Auto-registration: ✅ Enabled - will attempt to register users automatically")
+        print("🔍 CAPTCHA solving: ✅ Enabled via apitruecaptcha.org")
         print("Press Ctrl+C to stop\n")
         
         self.running = True
@@ -342,6 +498,20 @@ class RealTimeAvailabilityMonitor:
                 # Check dates (will skip server calls if no dates)
                 result = self.get_timeslots()
                 
+                # Attempt auto-registration if slots are available
+                if result['total_available_slots'] > 0:
+                    print(f"🔥 SLOTS DETECTED! Attempting auto-registration...")
+                    successful_registrations = self.attempt_auto_registration(result['registration_data'])
+                    
+                    if successful_registrations:
+                        # Refresh registrant list after successful registrations
+                        print("🔄 Refreshing pending registrants after successful registrations...")
+                        self.check_pending_registrants()
+                        
+                        # If no more pending registrants, we can reduce frequency
+                        if not self.pending_registrants:
+                            print("🎉 All registrants have been registered! Switching to standby mode...")
+                
                 # Show current status
                 self.print_status()
                 
@@ -376,8 +546,9 @@ class RealTimeAvailabilityMonitor:
         total_slots = sum(len(slots) for slots in self.results.values())
         pending_count = len(self.pending_registrants)
         
+        successful_regs = self.stats.get('successful_registrations', 0)
         print(f"[{now}] Status: {available_count} dates with slots, {total_slots} total slots, {pending_count} pending registrants")
-        print(f"🎯 Target months: {sorted(self.target_months) if self.target_months else 'None'} | Server checks: {self.stats['checks_performed']}")
+        print(f"🎯 Target months: {sorted(self.target_months) if self.target_months else 'None'} | Server checks: {self.stats['checks_performed']} | ✅ Registered: {successful_regs}")
         
         if self.results:
             print("Current availability:")

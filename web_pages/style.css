@@ -1,0 +1,1220 @@
+.body {
+    margin: 0px;
+    padding: 0px;
+    font: normal 12px/1.8em Arial, Helvetica, sans-serif;
+
+
+
+}
+
+.sait {
+    width: 285px;
+    height: 300px;
+    min-width: 285px;
+    min-height: 300px;
+    margin: 0 auto;
+    padding: 0px;
+    background-color: #cfc1a1;
+}
+
+.display:hidden {
+    background-color: #FFFFFF;
+    color: #cfc1a1
+}
+
+//.disabled {
+//   outline:33px solid #F00; /* Firefox, Opera, Chrome, IE8+ */
+//   *filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=-1, OffY=0,color=#FF0000) progid:DXImageTransform.Microsoft.dropshadow(OffX=1, OffY=0,color=#FF0000) progid:DXImageTransform.Microsoft.dropshadow(OffX=0, OffY=-1,color=#FF0000) progid:DXImageTransform.Microsoft.dropshadow(OffX=0, OffY=1,color=#FF0000); /* IE6, IE7 */
+
+}
+
+.header {
+    background-color: #cfc1a1;
+    height: 20px;
+    text-align: center;
+    font-size: 15px;
+    color: Black;
+    margin: 0px;
+    padding: 0px;
+    width: auto;
+}
+
+.center {
+    margin: 0px;
+    padding: 10px;
+    background-color: #cfc1a1;
+    text-align: ;
+}
+
+.tlo {
+    display: inline-block;
+    transform: rotate(0deg);
+    border-radius: 4px;
+    background-color: #f1f1f1;
+    border: none;
+    color: #7aafe4;
+    text-align: center;
+    font-size: 16px;
+    width: 150px;
+    height: 50px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 230px;
+    left: 10px;
+}
+
+.tlo_white {
+    display: inline-block;
+    background-color: white;
+    border: none;
+    color: #7aafe4;
+    text-align: center;
+    width: 400px;
+    height: px;
+    margin: 3px;
+    position: absolute;
+    top: 8px;
+}
+
+.grafika {
+    display: inline-block;
+    border-radius: 0px;
+    background-color: #f1f1f1;
+    border: none;
+    color: #7aafe4;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 80px;
+    transition: all 0.5 s;
+    margin: 3px;
+    position: absolute;
+    top: 8px;
+}
+
+.naglowek {
+    display: inline-block;
+    border-radius: 0px;
+    background-color: #f1f1f1;
+    border: none;
+    color: #7aafe4;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 70px;
+    transition: all 0.5 s;
+    margin: 3px;
+    position: absolute;
+    top: 87px;
+}
+
+dane_osobowe {
+    color: #545454;
+    font-family: Palatino Linotype, serif;
+    text-decoration: ;
+    font-size: 13px;
+    font-style: oblique;
+}
+
+p.a {
+    margin: 45px;
+}
+
+t.text {
+    color: #7aafe4;
+}
+
+.datepicker {
+    color: red;
+    font-size: 12px;
+    height: 1px;
+}
+
+legend {
+    background-color: #7aafe4;
+    color: white;
+    padding: 5px 10px;
+    font-size: 15px;
+    border-radius: 5px;
+}
+
+.pokoj_A {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 85px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 147px;
+
+
+
+}
+
+.pokoj_A_form {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 13px;
+    width: 400px;
+    height: 47px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 141px;
+}
+
+.pokoj_B {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 200px;
+    height: 45px;
+
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 200px;
+}
+
+.pokoj_B_form {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 200px;
+    height: 41px;
+    left: 197px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: -20px;
+}
+
+.pokoj_C {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 200px;
+    height: 53px;
+    left: 208px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 147px;
+}
+
+.pokoj_C_form {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 200px;
+    height: 41px;
+    left: 197px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: -20px;
+}
+
+.pokoj_D {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 200px;
+    height: 45px;
+    left: 208px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 200px;
+}
+
+.pokoj_D_form {
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 200px;
+    height: 41px;
+    left: 197px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: -20px;
+}
+
+.stanowiskoA {
+    position: initial;
+    background-color: #f1f1f1;
+    width: 33%;
+    color: #656565;
+    float: left;
+    height: auto;
+
+
+}
+
+.stanowiskoB {
+    position: initial;
+    float: left;
+    background-color: #f1f1f1;
+    width: 33%;
+    color: #656565;
+    height: auto;
+
+}
+
+.stanowiskoC {
+    position: initial;
+    float: left;
+    background-color: #f1f1f1;
+    width: 33%;
+    color: #656565;
+    height: auto;
+
+}
+
+.stanowiskoD {
+    float: left;
+    background-color: #f1f1f1;
+    width: 25%;
+    color: #656565;
+    height: auto;
+}
+
+.stanowiskoE {
+    float: left;
+    background-color: #f1f1f1;
+    width: 25%;
+    color: #656565;
+    height: auto;
+}
+
+.komunikat {
+    display: inline-block;
+    border-radius: 0px;
+    background-color: #f1f1f1;
+    border: none;
+    width: 400px;
+    height: ;
+    transition: all 0.5 s;
+    margin: 3px;
+    position: absolute;
+    top: 145px;
+
+}
+
+.komunikat2 {
+    display: inline-block;
+    border-radius: 0px;
+    background-color: #f1f1f1;
+    border: 1px;
+    width: 800px;
+    transition: all 0.5 s;
+    margin: 3px;
+    position: absolute;
+    left: 420px;
+    padding: 15px;
+    font-size: 7px;
+
+}
+
+.komunikat_zaplecze {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 160px;
+}
+
+.pokaz {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 415px;
+}
+
+.odwolaj {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 326px;
+}
+
+.dodaj_rezerwacje {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 355px;
+}
+
+.onoff {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 385px;
+}
+
+.pokazA1 {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 60px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 445px;
+}
+
+.pokazA2 {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 60px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 475px;
+}
+
+.pokazA3 {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 60px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: absolute;
+    top: 505px;
+}
+
+.pokazC {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 60px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 70px;
+    position: absolute;
+    top: 378px;
+}
+
+.pokazD {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 60px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 138px;
+    position: absolute;
+    top: 310px;
+}
+
+.pokazE {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 60px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 206px;
+    position: absolute;
+    top: 242px;
+}
+
+.wyloguj {
+    border-radius: 8px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: 22px;
+    transition: all 0.5 s;
+    cursor: pointer;
+    margin: 3px;
+    position: relative;
+    top: 525px;
+}
+
+.body_zaplecze {
+    border-radius: 4px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 14px;
+    width: px;
+    height: px;
+    cursor: ;
+    margin: 3px;
+    position: absolute;
+    top: 8px;
+    left: 420px;
+}
+
+.nr1 {
+    border-radius: 4px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 14px;
+    width: 240px;
+    height: px;
+    cursor: ;
+    margin: 3px;
+    position: absolute;
+    top: px;
+    left: px;
+}
+
+.nr2 {
+    border-radius: 4px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 14px;
+    width: 240px;
+    height: px;
+    cursor: ;
+    margin: 3px;
+    position: absolute;
+    top: px;
+    left: 250px;
+}
+
+.nr3 {
+    border-radius: 4px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 14px;
+    width: 240px;
+    height: px;
+    cursor: ;
+    margin: 3px;
+    position: absolute;
+    top: px;
+    left: 500px;
+}
+
+.nr4 {
+    border-radius: 4px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: #656565;
+    text-align: center;
+    font-size: 14px;
+    width: 240px;
+    height: px;
+    cursor: ;
+    margin: 3px;
+    position: absolute;
+    top: px;
+    left: 750px;
+}
+
+.potwierdzenie {
+    display: inline-block;
+    border-radius: 2px;
+    background-color: #f1f1f1;
+    border: 22px;
+    color: #0074e8;
+    text-align: center;
+    font-size: 16px;
+    width: px;
+    height: px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: auto;
+}
+
+.success {
+    border-radius: 4px;
+    display: inline-block;
+    background-color: #f1f1f1;
+    color: red;
+    text-align: center;
+    font-size: 14px;
+    width: 152px;
+    height: 130px;
+    cursor: ;
+    margin: 3px;
+    position: absolute;
+    top: 8px;
+    left: 1020px;
+}
+
+.a {
+    border: 2px solid;
+    border-collapse: collapse;
+    font: 11px "Lucida Grande", "Helvetica", "Arial", sans-serif;
+    border-color: #7abee9;
+}
+
+tr:hover.tr {
+    background-color: #7abee9;
+}
+
+br:hover.br {
+    background-color: red;
+}
+
+.formularz {
+    display: inline-block;
+    border-radius: 0px;
+    background-color: #f1f1f1;
+    border: none;
+    color: #7aafe4;
+    text-align: center;
+    font-size: 16px;
+    width: 400px;
+    height: ;
+    transition: all 0.5 s;
+    margin: 3px;
+    position: absolute;
+    top: 188px;
+}
+
+.captcha {}
+
+.logowanie {
+    display: inline-block;
+    border-radius: 10px;
+    background-color: #f1f1f1;
+    border: 22px;
+    color: #7aafe4;
+    text-align: center;
+    font-size: 16px;
+    width: 450px;
+    height: 330px;
+    transition: all 0.5 s;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: auto;
+}
+
+.komunikat_zaplecze span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.komunikat_zaplecze span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.komunikat_zaplecze:hover span {
+    padding-right: 25px;
+}
+
+.komunikat_zaplecze:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.odwolaj span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.odwolaj span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.odwolaj:hover span {
+    padding-right: 25px;
+}
+
+.odwolaj:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.dodaj_rezerwacje span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.dodaj_rezerwacje span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.dodaj_rezerwacje:hover span {
+    padding-right: 25px;
+}
+
+.dodaj_rezerwacje:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.onoff span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.onoff span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.onoff:hover span {
+    padding-right: 25px;
+}
+
+.onoff:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokaz span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokaz span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.pokaz:hover span {
+    padding-right: 25px;
+}
+
+.pokaz:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokazA1 span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokazA1 span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -5px;
+    transition: 0.5s;
+}
+
+.pokazA1:hover span {
+    padding-right: 15px;
+}
+
+.pokazA1:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokazA2 span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokazA2 span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -5px;
+    transition: 0.5s;
+}
+
+.pokazA2:hover span {
+    padding-right: 15px;
+}
+
+.pokazA2:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokazA3 span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokazA3 span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -5px;
+    transition: 0.5s;
+}
+
+.pokazA3:hover span {
+    padding-right: 15px;
+}
+
+.pokazA3:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokazC span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokazC span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -5px;
+    transition: 0.5s;
+}
+
+.pokazC:hover span {
+    padding-right: 15px;
+}
+
+.pokazC:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokazD span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokazD span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -5px;
+    transition: 0.5s;
+}
+
+.pokazD:hover span {
+    padding-right: 15px;
+}
+
+.pokazD:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokazE span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokazE span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -5px;
+    transition: 0.5s;
+}
+
+.pokazE:hover span {
+    padding-right: 15px;
+}
+
+.pokazE:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.wyloguj span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.wyloguj span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.wyloguj:hover span {
+    padding-right: 25px;
+}
+
+.wyloguj:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokoj_A span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokoj_A span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.pokoj_A:hover span {
+    padding-right: 25px;
+}
+
+.pokoj_A:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokoj_B span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokoj_B span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.pokoj_B:hover span {
+    padding-right: 25px;
+}
+
+.pokoj_B:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.pokoj_C span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.8s;
+
+
+}
+
+.pokoj_C span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.8s;
+
+
+}
+
+.pokoj_C:hover span {
+    padding-right: 25px;
+
+
+}
+
+.pokoj_C:hover span:after {
+    opacity: 1;
+    right: 0;
+
+}
+
+.pokoj_D span {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    transition: 0.5s;
+}
+
+.pokoj_D span:after {
+    content: '\00bb';
+    position: absolute;
+    opacity: 0;
+    top: 0;
+    right: -20px;
+    transition: 0.5s;
+}
+
+.pokoj_D:hover span {
+    padding-right: 25px;
+}
+
+.pokoj_D:hover span:after {
+    opacity: 1;
+    right: 0;
+}
+
+.datepicker_onoff {}
+
+input[type=text],
+select {
+    width: 100%;
+    padding: 8px 20px;
+    margin: 4px 0px;
+    display: inline-block;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+input[type=password],
+select {
+    width: 100%;
+    padding: 8px 20px;
+    margin: 4px 0px;
+    display: inline-block;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+input[type=email],
+select {
+    width: 100%;
+    padding: 8px 20px;
+    margin: 4px 0px;
+    display: inline-block;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+input[list=obywatel],
+select {
+    width: 100%;
+    padding: 8px 20px;
+    margin: 4px 0px;
+    display: inline-block;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/*
+label {
+color: #545454;
+}
+*/
+
+.label {
+    color: red;
+    padding: 18px;
+    font-family: Arial;
+}
+
+.availabledate a {
+    background-color: #4acc6a !important;
+    background-image: none !important;
+    color: #ffffff !important;
+}
+
+.unavailabledate p {
+    background-color: #ff0000;
+    background-image: none;
+    color: #ff0000;
+}
+
+/* sekcja start Radio */
+.radio-zaznacz {
+    margin: 5px;
+}
+
+.radio-zaznacz input[type="radio"] {
+    opacity: 0;
+    /*przezroczystość radio buton*/
+    position: absolute;
+    width: 0;
+    /*widoczny radio buton*/
+
+}
+
+.radio-zaznacz label {
+    display: inline-block;
+    background-color: #ffffff;
+    padding: 5px 10px;
+    font-family: sans-serif, Arial;
+    font-size: 14px;
+    border: 2px solid #cccccc;
+    border-radius: 7px;
+}
+
+.radio-zaznacz label:hover {
+    background-color: #dfd;
+}
+
+.radio-zaznacz input[type="radio"]:focus+label {
+    border: 2px solid red;
+}
+
+.radio-zaznacz input[type="radio"]:checked+label {
+    background-color: #bfb;
+    border-color: #9fd2f1;
+}
+
+/* sekcja koniec Radio */
