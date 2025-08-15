@@ -11,7 +11,7 @@ from datetime import datetime
 import logging
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 from selenium.webdriver.common.action_chains import ActionChains
-from capcha import solve_base64
+from capcha import solve_capcha_base64
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -656,7 +656,7 @@ class DatePickerScanner:
                 return False
             
             # Step 4: Solve CAPTCHA
-            captcha_solution = solve_base64(captcha_base64)
+            captcha_solution = solve_capcha_base64(captcha_base64)
             if not captcha_solution:
                 logger.error("Failed to solve CAPTCHA")
                 return False

@@ -29,14 +29,15 @@ class DatabaseManager:
     Handles connection management, table creation, and CRUD operations.
     """
     
-    def __init__(self):
+    def __init__(self, auto_create_tables=True):
         """Initialize database manager with connection from environment."""
         self.connection_string = os.getenv('DATABASE_URL')
         if not self.connection_string:
             raise ValueError("DATABASE_URL environment variable not found")
         
         self.connection = None
-        self._ensure_table_exists()
+        if auto_create_tables:
+            self._ensure_table_exists()
     
     def connect(self):
         """Establish database connection."""
@@ -70,8 +71,20 @@ class DatabaseManager:
         create_tables_sql = """
         -- Create reservations table first (referenced by registrants)
         CREATE TABLE IF NOT EXISTS reservations (
-            id VARCHAR(50) PRIMARY KEY
-            -- Additional fields will be added later
+            id VARCHAR(50) PRIMARY KEY,
+            appointment_date DATE,
+            appointment_time TIME,
+            appointment_datetime TIMESTAMP WITHOUT TIME ZONE,
+            room VARCHAR(100),
+            registration_code VARCHAR(20),
+            confirmed_name VARCHAR(50),
+            confirmed_surname VARCHAR(50),
+            confirmed_email VARCHAR(255),
+            confirmed_phone VARCHAR(20),
+            confirmed_citizenship VARCHAR(50),
+            confirmed_application_type VARCHAR(100),
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'UTC'),
+            updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'UTC')
         );
         
         -- Create registrants table
@@ -85,8 +98,8 @@ class DatabaseManager:
             application_type VARCHAR(100) NOT NULL,
             desired_month INTEGER NOT NULL CHECK (desired_month BETWEEN 1 AND 12),
             reservation VARCHAR(50) NULL REFERENCES reservations(id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'UTC'),
+            updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'UTC'),
             
             -- Constraints
             CONSTRAINT valid_citizenship CHECK (citizenship IN (
@@ -103,6 +116,11 @@ class DatabaseManager:
         CREATE INDEX IF NOT EXISTS idx_registrants_reservation ON registrants(reservation);
         CREATE INDEX IF NOT EXISTS idx_registrants_desired_month ON registrants(desired_month);
         CREATE INDEX IF NOT EXISTS idx_registrants_reservation_null ON registrants(reservation) WHERE reservation IS NULL;
+        
+        -- Indexes for reservations table
+        CREATE INDEX IF NOT EXISTS idx_reservations_appointment_date ON reservations(appointment_date);
+        CREATE INDEX IF NOT EXISTS idx_reservations_registration_code ON reservations(registration_code);
+        CREATE INDEX IF NOT EXISTS idx_reservations_confirmed_email ON reservations(confirmed_email);
         """
         
         try:
@@ -337,25 +355,99 @@ class DatabaseManager:
             logger.error(f"❌ Failed to get pending registrants: {e}")
             raise
     
-    def create_reservation(self, reservation_id: str) -> bool:
+    def create_reservation(self, reservation_id: str, success_data: Optional[dict] = None) -> bool:
         """
-        Create a new reservation record.
+        Create a new reservation record with optional success data.
         
         Args:
             reservation_id (str): Unique reservation ID
+            success_data (Optional[dict]): Success data from registration response
+                Keys: appointment_date, appointment_time, appointment_datetime, room,
+                      registration_code, name, surname, email, phone, citizenship, application_type
             
         Returns:
             bool: True if created successfully
         """
         self._ensure_connection()
         
-        insert_sql = "INSERT INTO reservations (id) VALUES (%s);"
+        if success_data:
+            # Parse datetime if provided as string (treat as local timezone)
+            appointment_datetime = None
+            if success_data.get('appointment_datetime'):
+                try:
+                    # Parse as naive datetime (local timezone)
+                    naive_dt = datetime.strptime(
+                        success_data['appointment_datetime'], 
+                        '%Y-%m-%d %H:%M'
+                    )
+                    # Keep it naive to avoid timezone conversion by PostgreSQL
+                    appointment_datetime = naive_dt
+                except ValueError:
+                    logger.warning(f"Invalid datetime format: {success_data['appointment_datetime']}")
+            
+            # Parse appointment_time if provided as string
+            appointment_time = None
+            if success_data.get('appointment_time'):
+                try:
+                    appointment_time = datetime.strptime(
+                        success_data['appointment_time'], 
+                        '%H:%M'
+                    ).time()
+                except ValueError:
+                    logger.warning(f"Invalid time format: {success_data['appointment_time']}")
+            
+            # Parse appointment_date if provided as string
+            appointment_date = None
+            if success_data.get('appointment_date'):
+                try:
+                    appointment_date = datetime.strptime(
+                        success_data['appointment_date'], 
+                        '%Y-%m-%d'
+                    ).date()
+                except ValueError:
+                    logger.warning(f"Invalid date format: {success_data['appointment_date']}")
+            
+            insert_sql = """
+            INSERT INTO reservations (
+                id, appointment_date, appointment_time, appointment_datetime, room,
+                registration_code, confirmed_name, confirmed_surname, confirmed_email,
+                confirmed_phone, confirmed_citizenship, confirmed_application_type,
+                created_at, updated_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            );
+            """
+            
+            params = (
+                reservation_id,
+                appointment_date,
+                appointment_time,
+                appointment_datetime,
+                success_data.get('room'),
+                success_data.get('registration_code'),
+                success_data.get('name'),
+                success_data.get('surname'),
+                success_data.get('email'),
+                success_data.get('phone'),
+                success_data.get('citizenship'),
+                success_data.get('application_type'),
+                datetime.now(),
+                datetime.now()
+            )
+        else:
+            # Simple reservation creation (backward compatibility)
+            insert_sql = "INSERT INTO reservations (id, created_at, updated_at) VALUES (%s, %s, %s);"
+            params = (reservation_id, datetime.now(), datetime.now())
         
         try:
             with self.connection.cursor() as cursor:
-                cursor.execute(insert_sql, (reservation_id,))
+                cursor.execute(insert_sql, params)
                 self.connection.commit()
-                logger.info(f"✅ Created reservation: {reservation_id}")
+                
+                if success_data:
+                    logger.info(f"✅ Created detailed reservation: {reservation_id} for {success_data.get('name', '')} {success_data.get('surname', '')}")
+                else:
+                    logger.info(f"✅ Created reservation: {reservation_id}")
                 return True
                 
         except psycopg2.IntegrityError:
@@ -594,18 +686,23 @@ def get_pending_registrations(month: Optional[int] = None) -> List[Registrant]:
         return db.get_pending_registrants(desired_month=month)
 
 
-def create_reservation_for_registrant(registrant_id: int, reservation_id: str) -> bool:
+def create_reservation_for_registrant(registrant_id: int, reservation_id: str, success_data: Optional[dict] = None) -> bool:
     """
     Create a reservation and assign it to a registrant.
     
     Args:
         registrant_id (int): Registrant ID
         reservation_id (str): Unique reservation ID
+        success_data (Optional[dict]): Success data from registration response
         
     Returns:
         bool: True if successful
     """
     with DatabaseManager() as db:
+        # Create reservation with success data
+        if success_data:
+            db.create_reservation(reservation_id, success_data)
+        
         return db.assign_reservation_to_registrant(
             registrant_id=registrant_id,
             reservation_id=reservation_id

@@ -44,10 +44,10 @@ def load_mock_registrants_to_db(json_file_path: str = "mock_registrants.json") -
         failed_inserts = len(registrants) - successful_inserts
         
         print(f"\n📊 Summary:")
-        print(f"  ✅ Successfully inserted: {successful_inserts}")
-        print(f"  ❌ Failed inserts: {failed_inserts}")
-        print(f"  🆔 Created IDs: {created_ids}")
-        print(f"  📋 Processing order: ID {min(created_ids) if created_ids else 'N/A'} will be processed first")
+        print(f"    ✅ Successfully inserted: {successful_inserts}")
+        print(f"    ❌ Failed inserts: {failed_inserts}")
+        print(f"    🆔 Created IDs: {created_ids}")
+        print(f"    📋 Processing order: ID {min(created_ids) if created_ids else 'N/A'} will be processed first")
         
         return created_ids
         
@@ -121,9 +121,7 @@ def delete_tables():
     print("\n🗑️  Deleting all tables...")
     
     try:
-        with DatabaseManager() as db:
-            db._ensure_connection()
-            
+        with DatabaseManager(auto_create_tables=False) as db:
             drop_tables_sql = """
             -- Drop tables in reverse order due to foreign key constraints
             DROP TABLE IF EXISTS registrants CASCADE;

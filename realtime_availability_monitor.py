@@ -10,13 +10,12 @@ import time
 import json
 import re
 from datetime import datetime, timedelta
-from ajax2py import parse_time_slots
-import random
+from zoneinfo import ZoneInfo
+from ajax2py import get_timeslots_for_single_date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from database import get_pending_registrations, create_reservation_for_registrant
-from ajax2py import send_registration_request, get_session_id
-from capcha import solve_base64
+from ajax2py import send_registration_request_with_retry
 import base64
 
 class RealTimeAvailabilityMonitor:
@@ -42,7 +41,8 @@ class RealTimeAvailabilityMonitor:
         self.pending_registrants = []
         self.target_months = set()
         self.last_db_check = None
-        self.db_check_interval = 1800  # Check database every n seconds
+        # self.db_check_interval = 1800  # Check database every n seconds
+        self.db_check_interval = 10  # Check database every n seconds
         
     def get_captcha_image(self, session_id=None):
         """Fetch CAPTCHA image from server and return as base64 string."""
@@ -104,57 +104,52 @@ class RealTimeAvailabilityMonitor:
             print(f"🎯 Attempting registration: {matching_registrant.name} {matching_registrant.surname} → {slot['display_text']}")
             
             try:
-                # Step 1: Get session and CAPTCHA
-                session_id = get_session_id(self.base_url)
-                if not session_id:
-                    print(f"❌ Failed to get session ID")
-                    continue
-                
-                captcha_base64, session_id = self.get_captcha_image(session_id)
-                if not captcha_base64:
-                    print(f"❌ Failed to get CAPTCHA image")
-                    continue
-                
-                # Step 2: Solve CAPTCHA
-                captcha_result = solve_base64(captcha_base64)
-                if not captcha_result.get('result'):
-                    print(f"❌ CAPTCHA solving failed: {captcha_result}")
-                    continue
-                    
-                captcha_code = captcha_result['result']
-                print(f"🔍 CAPTCHA solved: {captcha_code}")
-                
-                # Step 3: Prepare registration data
+                # Prepare registration data
                 registrant_data = matching_registrant.to_registration_data()
                 timeslot_data = {
                     'date': slot['date'],
                     'timeslot_value': slot['timeslot_value']
                 }
                 
-                # Step 4: Send registration request
-                print(f"📤 Sending registration request...")
-                registration_result = send_registration_request(
+                # Send registration request with built-in CAPTCHA retry mechanism
+                print(f"📤 Sending registration request with automatic CAPTCHA retry...")
+                registration_result = send_registration_request_with_retry(
                     base_url=self.base_url,
                     registrant_data=registrant_data,
                     timeslot_data=timeslot_data,
-                    captcha_code=captcha_code,
-                    session_id=session_id
+                    max_retries=12
                 )
                 
-                # Step 5: Process result
+                # Process result
                 if registration_result.get('success'):
                     # Generate reservation ID and update database
                     import uuid
-                    reservation_id = f"AUTO_{uuid.uuid4().hex[:8].upper()}"
+                    
+                    # Use registration code from success data if available, otherwise generate one
+                    success_data = registration_result.get('success_data')
+                    if success_data and success_data.get('registration_code'):
+                        reservation_id = f"{success_data['registration_code']}"
+                    else:
+                        reservation_id = f"AUTO_{uuid.uuid4().hex[:8].upper()}"
                     
                     success = create_reservation_for_registrant(
                         registrant_id=matching_registrant.id,
-                        reservation_id=reservation_id
+                        reservation_id=reservation_id,
+                        success_data=success_data
                     )
                     
                     if success:
-                        print(f"✅ REGISTRATION SUCCESS: {matching_registrant.name} {matching_registrant.surname}")
-                        print(f"   📅 Slot: {slot['display_text']}")
+                        attempt_info = f" (attempt {registration_result.get('attempt', 1)}/{registration_result.get('max_retries', 3) + 1})" if registration_result.get('attempt', 1) > 1 else ""
+                        print(f"✅ REGISTRATION SUCCESS: {matching_registrant.name} {matching_registrant.surname}{attempt_info}")
+                        
+                        if success_data:
+                            print(f"   📅 Confirmed: {success_data.get('appointment_date')} {success_data.get('appointment_time')} - {success_data.get('room')}")
+                            print(f"   📧 Email: {success_data.get('email')}")
+                            print(f"   📞 Phone: {success_data.get('phone')}")
+                            print(f"   🆔 Code: {success_data.get('registration_code')}")
+                        else:
+                            print(f"   📅 Slot: {slot['display_text']}")
+                        
                         print(f"   🆔 Reservation: {reservation_id}")
                         
                         successful_registrations.append({
@@ -175,10 +170,12 @@ class RealTimeAvailabilityMonitor:
                         print(f"❌ Database update failed for {matching_registrant.name}")
                         
                 else:
-                    print(f"❌ Registration failed: {registration_result.get('message', 'Unknown error')}")
+                    attempt_info = f" (failed after {registration_result.get('attempt', 1)} attempts)" if registration_result.get('attempt') else ""
+                    error_msg = registration_result.get('message') or registration_result.get('error', 'Unknown error')
+                    print(f"❌ Registration failed{attempt_info}: {error_msg}")
                     
                 # Be nice to server between attempts
-                time.sleep(2)
+                time.sleep(0.2)
                 
             except Exception as e:
                 print(f"❌ Registration error for {matching_registrant.name}: {e}")
@@ -315,34 +312,6 @@ class RealTimeAvailabilityMonitor:
         print(f"✅ Found {len(available_dates)} potentially available dates in target months")
         return available_dates
     
-    def check_single_date(self, date_str):
-        """Check availability for a single date using existing ajax2py pattern."""
-        url = f"{self.base_url}{self.endpoint}"
-        
-        data = {'godzina': date_str}
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': self.base_url,
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-        
-        try:
-            # Sleep for server courtesy before each request
-            time.sleep(0.2)
-            
-            response = requests.post(url, data=data, headers=headers, timeout=10)
-            if response.status_code == 200:
-                # Reuse existing parse_time_slots function
-                slots = parse_time_slots(response.text)
-                with self.stats_lock:
-                    self.stats['checks_performed'] += 1
-                return (date_str, slots)
-            else:
-                return (date_str, [])
-        except Exception as e:
-            return (date_str, [])
-    
     def get_timeslots(self):
         """Single sweep through all available dates using parallel processing.
         Returns structured timeslot data ready for registration process."""
@@ -372,7 +341,7 @@ class RealTimeAvailabilityMonitor:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all date checks
             future_to_date = {
-                executor.submit(self.check_single_date, date_str): date_str 
+                executor.submit(get_timeslots_for_single_date, date_str, self.base_url, self.endpoint): date_str 
                 for date_str in self.available_dates
             }
             
@@ -387,6 +356,15 @@ class RealTimeAvailabilityMonitor:
                 try:
                     date_str, slots = future.result()
                     completed_count += 1
+                    self.stats['checks_performed'] += 1
+
+                    # Filter out past timeslots for today (Poland timezone)
+                    current_datetime = datetime.now(ZoneInfo("Europe/Warsaw"))
+                    if date_str == current_datetime.strftime("%Y-%m-%d"):
+                        # Add 3-hour buffer to current time
+                        buffer_datetime = current_datetime + timedelta(hours=3)   # AG: Time buffer
+                        buffer_time = buffer_datetime.strftime("%H:%M")
+                        slots = [slot for slot in slots if slot > buffer_time]
                     
                     print(f"ℹ️  Completed {date_str} ({completed_count}/{total_dates}) - {len(slots)} slots")
                     
@@ -398,8 +376,7 @@ class RealTimeAvailabilityMonitor:
                             else:
                                 print(f"📝 UPDATED: {date_str} -> {', '.join(slots)}")
                             new_slots_found = True
-                            with self.stats_lock:
-                                self.stats['slots_found'] += len(slots)
+                            self.stats['slots_found'] += len(slots)
                         
                         self.results[date_str] = slots
                     else:
@@ -464,11 +441,6 @@ class RealTimeAvailabilityMonitor:
         self.running = True
         self.stats['start_time'] = datetime.now().isoformat()
         
-        # Initial registrant check
-        has_registrants = self.check_pending_registrants()
-        if not has_registrants:
-            print("⚠️  No pending registrants found. Monitoring will wait for registrants...")
-        
         try:
             start_time = time.time()
             cycle_count = 0
@@ -486,7 +458,7 @@ class RealTimeAvailabilityMonitor:
                         if wait_cycles == 1:
                             print("⏸️  No pending registrants - entering standby mode")
                         print(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
-                        time.sleep(self.db_check_interval)
+                        time.sleep(self.db_check_interval+10)  # AG: Not very nice!
                         continue
                     elif wait_cycles > 0:
                         print("🎉 Found pending registrants - resuming active monitoring!")

@@ -3,13 +3,13 @@ import base64
 import os
 from dotenv import load_dotenv
 
-
 load_dotenv()
 USER_ID = os.environ.get("USER_ID")
 KEY = os.environ.get("KEY")
 
-def solve(f):
-    with open(f, "rb") as image_file:
+
+def solve_capcha_file(file_path:str):
+    with open(file_path, "rb") as image_file:
         encoded_string = base64.b64encode(image_file.read()).decode('ascii')
         url = 'https://api.apitruecaptcha.org/one/gettext'
 
@@ -22,7 +22,7 @@ def solve(f):
         data = response.json()
         return data
     
-def solve_base64(base_64_capcha:str):
+def solve_capcha_base64(base_64_capcha:str):
     url = 'https://api.apitruecaptcha.org/one/gettext'
 
     data = { 
