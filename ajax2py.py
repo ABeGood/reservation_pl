@@ -5,9 +5,12 @@ import re
 import base64
 from dotenv import load_dotenv
 from capcha import solve_capcha_base64
+from logging_config import get_logger
 
 # Load environment variables for CAPTCHA solving
 load_dotenv()
+
+logger = get_logger(__name__)
 
 
 def parse_time_slots(html_response):
@@ -131,7 +134,7 @@ def send_registration_request_with_retry(base_url: str, registrant_data: dict, t
             # Check if this was a CAPTCHA error
             if _is_captcha_error(result):
                 if attempt < max_retries:
-                    print(f"CAPTCHA error detected (attempt {attempt + 1}/{max_retries + 1}). Retrying with new CAPTCHA...")
+                    logger.warning(f"CAPTCHA error detected (attempt {attempt + 1}/{max_retries + 1}). Retrying with new CAPTCHA...")
                     time.sleep(0.2)  # Brief delay between attempts
                     continue
                 else:
@@ -147,7 +150,7 @@ def send_registration_request_with_retry(base_url: str, registrant_data: dict, t
             
         except Exception as e:
             if attempt < max_retries:
-                print(f"Unexpected error on attempt {attempt + 1}: {e}. Retrying...")
+                logger.error(f"Unexpected error on attempt {attempt + 1}: {e}. Retrying...")
                 time.sleep(1)
                 continue
             else:

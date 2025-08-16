@@ -305,14 +305,17 @@ if __name__ == "__main__":
     emitter.emit_error("Test error", {'code': 500})
     
     # Consume events
-    print("Testing event queue:")
+    from logging_config import get_logger
+    logger = get_logger(__name__)
+    
+    logger.info("Testing event queue:")
     while True:
         event = event_queue.get_event(timeout=1.0)
         if event is None:
             break
-        print(f"Event: {event.event_type.value} - {event.message}")
-        print(f"Data: {event.data}")
-        print(f"Priority: {event.priority}")
-        print("---")
+        logger.info(f"Event: {event.event_type.value} - {event.message}")
+        logger.info(f"Data: {event.data}")
+        logger.info(f"Priority: {event.priority}")
+        logger.info("---")
     
-    print(f"Queue stats: {event_queue.get_stats()}")
+    logger.info(f"Queue stats: {event_queue.get_stats()}")

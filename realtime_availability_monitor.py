@@ -25,6 +25,9 @@ from monitor_events_manager import (
     emit_status_update
 )
 import base64
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class RealTimeAvailabilityMonitor:
     def __init__(self, page_url="https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A1.php"):
@@ -71,17 +74,17 @@ class RealTimeAvailabilityMonitor:
                 self.stats['target_months'] = list(self.target_months)
                 self.stats['last_registrant_check'] = datetime.now().isoformat()
             
-            print(f"🗄️ Database refresh: {len(self.pending_registrants)} pending registrants for months {list(self.target_months)}")
+            logger.info(f"🗄️ Database refresh: {len(self.pending_registrants)} pending registrants for months {list(self.target_months)}")
             return True
         except Exception as e:
             error_msg = f"Failed to refresh database: {str(e)}"
-            print(f"❌ {error_msg}")
+            logger.error(f"❌ {error_msg}")
             emit_error(error_msg, {'exception': str(e)})
             return False
     
     def run_enhanced_monitoring(self, check_interval:float, auto_registration:bool):
         """Enhanced monitoring with event emission. Leverages existing start_monitoring()."""
-        print("🚀 Starting enhanced monitoring with Telegram notifications...")
+        logger.info("🚀 Starting enhanced monitoring with Telegram notifications...")
         
         # Simply delegate to the existing start_monitoring method
         # which already has all the functionality we need
@@ -105,10 +108,10 @@ class RealTimeAvailabilityMonitor:
                 captcha_base64 = base64.b64encode(response.content).decode('ascii')
                 return captcha_base64, response.cookies.get('PHPSESSID', session_id)
             else:
-                print(f"❌ Failed to fetch CAPTCHA: HTTP {response.status_code}")
+                logger.error(f"❌ Failed to fetch CAPTCHA: HTTP {response.status_code}")
                 return None, None
         except Exception as e:
-            print(f"❌ CAPTCHA fetch error: {e}")
+            logger.error(f"❌ CAPTCHA fetch error: {e}")
             return None, None
 
     def attempt_auto_registration(self, available_slots):
@@ -127,7 +130,7 @@ class RealTimeAvailabilityMonitor:
         
         successful_registrations = []
         
-        print(f"🎯 Attempting auto-registration for {len(available_slots)} available slots...")
+        logger.info(f"🎯 Attempting auto-registration for {len(available_slots)} available slots...")
         
         for slot in available_slots:
             slot_date = slot['date']  # YYYY-MM-DD format
@@ -141,10 +144,10 @@ class RealTimeAvailabilityMonitor:
                     break
             
             if not matching_registrant:
-                print(f"⏭️  No matching registrant for {slot_date} (month {slot_month})")
+                logger.info(f"⏭️  No matching registrant for {slot_date} (month {slot_month})")
                 continue
                 
-            print(f"🎯 Attempting registration: {matching_registrant.name} {matching_registrant.surname} → {slot['display_text']}")
+            logger.info(f"🎯 Attempting registration: {matching_registrant.name} {matching_registrant.surname} → {slot['display_text']}")
             
             try:
                 # Prepare registration data
@@ -155,7 +158,7 @@ class RealTimeAvailabilityMonitor:
                 }
                 
                 # Send registration request with built-in CAPTCHA retry mechanism
-                print(f"📤 Sending registration request with automatic CAPTCHA retry...")
+                logger.info(f"📤 Sending registration request with automatic CAPTCHA retry...")
                 registration_result = send_registration_request_with_retry(
                     base_url=self.base_url,
                     registrant_data=registrant_data,
@@ -189,17 +192,17 @@ class RealTimeAvailabilityMonitor:
                         )
                         
                         attempt_info = f" (attempt {registration_result.get('attempt', 1)}/{registration_result.get('max_retries', 3) + 1})" if registration_result.get('attempt', 1) > 1 else ""
-                        print(f"✅ REGISTRATION SUCCESS: {matching_registrant.name} {matching_registrant.surname}{attempt_info}")
+                        logger.info(f"✅ REGISTRATION SUCCESS: {matching_registrant.name} {matching_registrant.surname}{attempt_info}")
                         
                         if success_data:
-                            print(f"   📅 Confirmed: {success_data.get('appointment_date')} {success_data.get('appointment_time')} - {success_data.get('room')}")
-                            print(f"   📧 Email: {success_data.get('email')}")
-                            print(f"   📞 Phone: {success_data.get('phone')}")
-                            print(f"   🆔 Code: {success_data.get('registration_code')}")
+                            logger.info(f"   📅 Confirmed: {success_data.get('appointment_date')} {success_data.get('appointment_time')} - {success_data.get('room')}")
+                            logger.info(f"   📧 Email: {success_data.get('email')}")
+                            logger.info(f"   📞 Phone: {success_data.get('phone')}")
+                            logger.info(f"   🆔 Code: {success_data.get('registration_code')}")
                         else:
-                            print(f"   📅 Slot: {slot['display_text']}")
+                            logger.info(f"   📅 Slot: {slot['display_text']}")
                         
-                        print(f"   🆔 Reservation: {reservation_id}")
+                        logger.info(f"   🆔 Reservation: {reservation_id}")
                         
                         successful_registrations.append({
                             'registrant_id': matching_registrant.id,
@@ -217,7 +220,7 @@ class RealTimeAvailabilityMonitor:
                         
                     else:
                         error_msg = f"Database update failed for {matching_registrant.name}"
-                        print(f"❌ {error_msg}")
+                        logger.error(f"❌ {error_msg}")
                         emit_registration_failed(
                             registrant_data=registrant_data,
                             slot_data=slot,
@@ -228,7 +231,7 @@ class RealTimeAvailabilityMonitor:
                     attempt_info = f" (failed after {registration_result.get('attempt', 1)} attempts)" if registration_result.get('attempt') else ""
                     error_msg = registration_result.get('message') or registration_result.get('error', 'Unknown error')
                     full_error_msg = f"Registration failed{attempt_info}: {error_msg}"
-                    print(f"❌ {full_error_msg}")
+                    logger.error(f"❌ {full_error_msg}")
                     
                     emit_registration_failed(
                         registrant_data=registrant_data,
@@ -241,7 +244,7 @@ class RealTimeAvailabilityMonitor:
                 
             except Exception as e:
                 error_msg = f"Registration error for {matching_registrant.name}: {str(e)}"
-                print(f"❌ {error_msg}")
+                logger.error(f"❌ {error_msg}")
                 emit_registration_failed(
                     registrant_data=matching_registrant.to_registration_data(),
                     slot_data=slot,
@@ -250,11 +253,11 @@ class RealTimeAvailabilityMonitor:
                 continue
         
         if successful_registrations:
-            print(f"🎉 AUTO-REGISTRATION SUMMARY: {len(successful_registrations)} successful registrations!")
+            logger.info(f"🎉 AUTO-REGISTRATION SUMMARY: {len(successful_registrations)} successful registrations!")
             with self.stats_lock:
                 self.stats['successful_registrations'] = self.stats.get('successful_registrations', 0) + len(successful_registrations)
         else:
-            print("ℹ️  No successful registrations in this attempt")
+            logger.info("ℹ️  No successful registrations in this attempt")
             
         return successful_registrations
 
@@ -266,7 +269,7 @@ class RealTimeAvailabilityMonitor:
             
             # Check if target months changed
             if new_target_months != self.target_months:
-                print(f"📊 Target months updated: {sorted(new_target_months)} (was: {sorted(self.target_months)})")
+                logger.info(f"📊 Target months updated: {sorted(new_target_months)} (was: {sorted(self.target_months)})")
                 self.target_months = new_target_months
                 # Clear available_dates to force recalculation
                 self.available_dates = []
@@ -278,15 +281,15 @@ class RealTimeAvailabilityMonitor:
             
             self.last_db_check = datetime.now()
             
-            print(f"👥 Found {len(self.pending_registrants)} pending registrants for months: {sorted(self.target_months)}")
+            logger.info(f"👥 Found {len(self.pending_registrants)} pending registrants for months: {sorted(self.target_months)}")
             
             for registrant in self.pending_registrants:
-                print(f"  - {registrant.name} {registrant.surname} (month {registrant.desired_month})")
+                logger.info(f"  - {registrant.name} {registrant.surname} (month {registrant.desired_month})")
             
             return len(self.pending_registrants) > 0
             
         except Exception as e:
-            print(f"❌ Error checking pending registrants: {e}")
+            logger.error(f"❌ Error checking pending registrants: {e}")
             return len(self.pending_registrants) > 0  # Continue if we had registrants before
 
     def should_check_database(self):
@@ -297,7 +300,7 @@ class RealTimeAvailabilityMonitor:
 
     def extract_datepicker_config(self):
         """Dynamically extract datepicker configuration from the web page."""
-        print(f"🔍 Extracting datepicker configuration from {self.page_url}...")
+        logger.info(f"🔍 Extracting datepicker configuration from {self.page_url}...")
         
         try:
             response = requests.get(self.page_url, timeout=10)
@@ -313,7 +316,7 @@ class RealTimeAvailabilityMonitor:
                 # Extract dates from the array
                 dates_str = disabled_days_match.group(1)
                 disabled_days = re.findall(r'"(\d{4}-\d{2}-\d{2})"', dates_str)
-                print(f"📅 Found {len(disabled_days)} disabled days")
+                logger.info(f"📅 Found {len(disabled_days)} disabled days")
             
             # Extract minDate and maxDate
             min_date_match = re.search(r'minDate:\s*new Date\("(\d{4}/\d{2}/\d{2})"\)', html_content)
@@ -329,8 +332,8 @@ class RealTimeAvailabilityMonitor:
             min_date = datetime.strptime(min_date_str, "%Y-%m-%d")
             max_date = datetime.strptime(max_date_str, "%Y-%m-%d")
             
-            print(f"📅 Date range: {min_date_str} to {max_date_str}")
-            print(f"🚫 Disabled days: {len(disabled_days)} dates")
+            logger.info(f"📅 Date range: {min_date_str} to {max_date_str}")
+            logger.info(f"🚫 Disabled days: {len(disabled_days)} dates")
             
             return {
                 'min_date': min_date,
@@ -339,8 +342,8 @@ class RealTimeAvailabilityMonitor:
             }
             
         except Exception as e:
-            print(f"❌ Error extracting datepicker config: {e}")
-            print("Using fallback configuration...")
+            logger.error(f"❌ Error extracting datepicker config: {e}")
+            logger.info("Using fallback configuration...")
             # Fallback to reasonable defaults
             return {
                 'min_date': datetime.now(),
@@ -351,7 +354,7 @@ class RealTimeAvailabilityMonitor:
     def get_available_dates(self):
         """Get available dates filtered by registrant desired months."""
         if not self.target_months:
-            print("⏸️  No target months - no pending registrants")
+            logger.info("⏸️  No target months - no pending registrants")
             return []
             
         config = self.extract_datepicker_config()
@@ -362,8 +365,8 @@ class RealTimeAvailabilityMonitor:
         current_date = max(config['min_date'].date(), today)  # Use today if it's later than minDate
         current_date = datetime.combine(current_date, datetime.min.time())  # Convert back to datetime
         
-        print(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
-        print(f"🎯 Filtering for target months: {sorted(self.target_months)}")
+        logger.info(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
+        logger.info(f"🎯 Filtering for target months: {sorted(self.target_months)}")
         
         while current_date <= config['max_date']:
             date_str = current_date.strftime("%Y-%m-%d")
@@ -376,8 +379,8 @@ class RealTimeAvailabilityMonitor:
             
             current_date += timedelta(days=1)
         
-        print(f"ℹ️  Days to check: {', '.join(available_dates[:10])}{'...' if len(available_dates) > 10 else ''}")
-        print(f"✅ Found {len(available_dates)} potentially available dates in target months")
+        logger.info(f"ℹ️  Days to check: {', '.join(available_dates[:10])}{'...' if len(available_dates) > 10 else ''}")
+        logger.info(f"✅ Found {len(available_dates)} potentially available dates in target months")
         return available_dates
     
     def get_timeslots(self):
@@ -387,7 +390,7 @@ class RealTimeAvailabilityMonitor:
         
         # Skip server calls if no available dates
         if not self.available_dates:
-            print(f"[{now}] ⏸️  No dates to check - skipping server calls")
+            logger.info(f"[{now}] ⏸️  No dates to check - skipping server calls")
             return {
                 'slots_found': False,
                 'total_available_slots': 0,
@@ -400,8 +403,8 @@ class RealTimeAvailabilityMonitor:
                 }
             }
         
-        print(f"[{now}] Checking {len(self.available_dates)} dates in parallel...")
-        print(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
+        logger.info(f"[{now}] Checking {len(self.available_dates)} dates in parallel...")
+        logger.info(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
         
         new_slots_found = False
         max_workers = min(8, len(self.available_dates))  # Use 8 workers max, or fewer if less dates
@@ -434,15 +437,15 @@ class RealTimeAvailabilityMonitor:
                         buffer_time = buffer_datetime.strftime("%H:%M")
                         slots = [slot for slot in slots if slot > buffer_time]
                     
-                    print(f"ℹ️  Completed {date_str} ({completed_count}/{total_dates}) - {len(slots)} slots")
+                    logger.info(f"ℹ️  Completed {date_str} ({completed_count}/{total_dates}) - {len(slots)} slots")
                     
                     # Track changes
                     if slots:
                         if date_str not in self.results or self.results[date_str] != slots:
                             if date_str not in self.results:
-                                print(f"🎉 NEW AVAILABILITY: {date_str} -> {', '.join(slots)}")
+                                logger.info(f"🎉 NEW AVAILABILITY: {date_str} -> {', '.join(slots)}")
                             else:
-                                print(f"📝 UPDATED: {date_str} -> {', '.join(slots)}")
+                                logger.info(f"📝 UPDATED: {date_str} -> {', '.join(slots)}")
                             new_slots_found = True
                             self.stats['slots_found'] += len(slots)
                         
@@ -450,15 +453,15 @@ class RealTimeAvailabilityMonitor:
                     else:
                         # Remove if no longer available
                         if date_str in self.results:
-                            print(f"❌ REMOVED: {date_str} (no longer available)")
+                            logger.info(f"❌ REMOVED: {date_str} (no longer available)")
                             del self.results[date_str]
                         # Don't print "no slots" for every date to reduce noise
                 
                 except Exception as e:
-                    print(f"❌ Error checking {future_to_date[future]}: {e}")
+                    logger.error(f"❌ Error checking {future_to_date[future]}: {e}")
         
         self.stats['last_check'] = datetime.now().isoformat()
-        print(f"✅ Parallel check completed: {completed_count}/{total_dates} dates processed")
+        logger.info(f"✅ Parallel check completed: {completed_count}/{total_dates} dates processed")
         
         # Return structured data ready for registration
         registration_ready_slots = []
@@ -497,14 +500,14 @@ class RealTimeAvailabilityMonitor:
     
     def start_monitoring(self, max_duration_minutes=None, check_interval:float=0.5, auto_registration:bool=True):
         """Start continuous monitoring with database-aware smart scheduling."""
-        print("🚀 Starting smart real-time availability monitoring with AUTO-REGISTRATION...")
-        print(f"Monitoring endpoint: {self.base_url}{self.endpoint}")
-        print("📊 Database integration: ✅ Enabled")
-        print("🎯 Smart scheduling: Only monitors months with pending registrants")
-        print("⏸️  Auto-pause: Stops server calls when no pending registrants")
-        print("🤖 Auto-registration: ✅ Enabled - will attempt to register users automatically")
-        print("🔍 CAPTCHA solving: ✅ Enabled via apitruecaptcha.org")
-        print("Press Ctrl+C to stop\n")
+        logger.info("🚀 Starting smart real-time availability monitoring with AUTO-REGISTRATION...")
+        logger.info(f"Monitoring endpoint: {self.base_url}{self.endpoint}")
+        logger.info("📊 Database integration: ✅ Enabled")
+        logger.info("🎯 Smart scheduling: Only monitors months with pending registrants")
+        logger.info("⏸️  Auto-pause: Stops server calls when no pending registrants")
+        logger.info("🤖 Auto-registration: ✅ Enabled - will attempt to register users automatically")
+        logger.info("🔍 CAPTCHA solving: ✅ Enabled via apitruecaptcha.org")
+        logger.info("Press Ctrl+C to stop\n")
         
         self.running = True
         self.stats['start_time'] = datetime.now().isoformat()
@@ -525,12 +528,12 @@ class RealTimeAvailabilityMonitor:
                         if not has_registrants:
                             wait_cycles += 1
                             if wait_cycles == 1:
-                                print("⏸️  No pending registrants - entering standby mode")
-                            print(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
+                                logger.info("⏸️  No pending registrants - entering standby mode")
+                            logger.info(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
                             time.sleep(self.db_check_interval+10)  # AG: Not very nice!
                             continue
                         elif wait_cycles > 0:
-                            print("🎉 Found pending registrants - resuming active monitoring!")
+                            logger.info("🎉 Found pending registrants - resuming active monitoring!")
                             wait_cycles = 0
 
                     # Get available dates (filtered by target months)
@@ -541,14 +544,14 @@ class RealTimeAvailabilityMonitor:
                 
                 except Exception as e:
                     error_msg = f"Error during monitoring cycle: {str(e)}"
-                    print(f"❌ {error_msg}")
+                    logger.error(f"❌ {error_msg}")
                     emit_error(error_msg, {'exception': str(e)})
                     time.sleep(1)  # Wait before retrying
                     continue
                 
                 # Attempt auto-registration if slots are available
                 if result['total_available_slots'] > 0:
-                    print(f"🔥 SLOTS DETECTED! Attempting auto-registration...")
+                    logger.info(f"🔥 SLOTS DETECTED! Attempting auto-registration...")
                     
                     # Emit slot found event
                     if result.get('slots_found', False):
@@ -562,12 +565,12 @@ class RealTimeAvailabilityMonitor:
                         
                         if successful_registrations:
                             # Refresh registrant list after successful registrations
-                            print("🔄 Refreshing pending registrants after successful registrations...")
+                            logger.info("🔄 Refreshing pending registrants after successful registrations...")
                             self.check_pending_registrants()
                             
                             # If no more pending registrants, we can reduce frequency
                             if not self.pending_registrants:
-                                print("🎉 All registrants have been registered! Switching to standby mode...")
+                                logger.info("🎉 All registrants have been registered! Switching to standby mode...")
                 
                 # Show current status
                 self.print_status()
@@ -581,13 +584,13 @@ class RealTimeAvailabilityMonitor:
                 if max_duration_minutes:
                     elapsed_minutes = (time.time() - start_time) / 60
                     if elapsed_minutes >= max_duration_minutes:
-                        print(f"\n⏰ Stopping after {max_duration_minutes} minutes")
+                        logger.info(f"\n⏰ Stopping after {max_duration_minutes} minutes")
                         break
                 
                 time.sleep(check_interval)
                 
         except KeyboardInterrupt:
-            print("\n🛑 Monitoring stopped by user")
+            logger.info("\n🛑 Monitoring stopped by user")
         finally:
             self.running = False
             self.save_results()
@@ -600,20 +603,20 @@ class RealTimeAvailabilityMonitor:
         pending_count = len(self.pending_registrants)
         
         successful_regs = self.stats.get('successful_registrations', 0)
-        print(f"[{now}] Status: {available_count} dates with slots, {total_slots} total slots, {pending_count} pending registrants")
-        print(f"🎯 Target months: {sorted(self.target_months) if self.target_months else 'None'} | Server checks: {self.stats['checks_performed']} | ✅ Registered: {successful_regs}")
+        logger.info(f"[{now}] Status: {available_count} dates with slots, {total_slots} total slots, {pending_count} pending registrants")
+        logger.info(f"🎯 Target months: {sorted(self.target_months) if self.target_months else 'None'} | Server checks: {self.stats['checks_performed']} | ✅ Registered: {successful_regs}")
         
         if self.results:
-            print("Current availability:")
+            logger.info("Current availability:")
             for date_str, slots in sorted(self.results.items()):
                 month = datetime.strptime(date_str, "%Y-%m-%d").month
                 matching_registrants = [r for r in self.pending_registrants if r.desired_month == month]
-                print(f"  📅 {date_str}: {', '.join(slots)} → {len(matching_registrants)} registrants interested")
+                logger.info(f"  📅 {date_str}: {', '.join(slots)} → {len(matching_registrants)} registrants interested")
         else:
             if self.target_months:
-                print("  ❌ No slots currently available in target months")
+                logger.info("  ❌ No slots currently available in target months")
             else:
-                print("  ⏸️  No target months - no pending registrants")
+                logger.info("  ⏸️  No target months - no pending registrants")
     
     def save_results(self):
         """Save current results to file."""
@@ -639,7 +642,7 @@ class RealTimeAvailabilityMonitor:
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
         
-        print(f"📁 Results saved to: {filename}")
+        logger.info(f"📁 Results saved to: {filename}")
 
 def main():
     print("Real-time Polish Card Appointment Monitor")

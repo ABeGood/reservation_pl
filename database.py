@@ -18,8 +18,9 @@ from models import Registrant, Reservation
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class DatabaseManager:
@@ -738,8 +739,8 @@ if __name__ == "__main__":
     # Test database operations
     try:
         with DatabaseManager() as db:
-            print("Database connection test successful!")
+            logger.info("Database connection test successful!")
             stats = db.get_statistics()
-            print(f"Current stats: {stats}")
+            logger.info(f"Current stats: {stats}")
     except Exception as e:
-        print(f"Database test failed: {e}")
+        logger.error(f"Database test failed: {e}")

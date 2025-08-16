@@ -22,7 +22,10 @@ from monitor_events_manager import get_event_queue, EventType, MonitorEvent
 
 class TelegramBot:
     def __init__(self, bot_token: str):
-        self.bot = AsyncTeleBot(token=bot_token)
+        self.bot = AsyncTeleBot(
+            token=bot_token,
+            state_storage=None  # Disable state storage for better stability
+        )
         self.db_manager = DatabaseManager()
         self.monitor_controller = get_monitor_controller()
         self.event_queue = get_event_queue()
@@ -40,7 +43,8 @@ class TelegramBot:
             except ValueError:
                 pass
         
-        self.logger = logging.getLogger(__name__)
+        from logging_config import get_logger
+        self.logger = get_logger(__name__)
         self.logger.setLevel(logging.INFO)
         
         if not self.logger.handlers:
@@ -164,7 +168,7 @@ class TelegramBot:
         except Exception as e:
             tb = traceback.format_exc()
             self.logger.error(f"Bot polling stopped due to an error: {e}\nFull traceback:\n{tb}")
-            sleep(5)
+            sleep(3)
             self.run_bot()
 
     def register_handlers(self):
@@ -383,5 +387,7 @@ if __name__ == "__main__":
         )
         bot.run_bot()
     except Exception as e:
-        print(f"Failed to start bot: {e}")
-        print("Make sure you've set your BOT_TOKEN correctly!")
+        from logging_config import get_logger
+        logger = get_logger(__name__)
+        logger.error(f"Failed to start bot: {e}")
+        logger.error("Make sure you've set your BOT_TOKEN correctly!")

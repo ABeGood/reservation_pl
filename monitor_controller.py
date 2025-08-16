@@ -7,7 +7,7 @@ import threading
 import time
 from typing import Optional, Dict, Any
 from datetime import datetime
-import logging
+from logging_config import get_logger
 
 from realtime_availability_monitor import RealTimeAvailabilityMonitor
 from monitor_events_manager import get_event_emitter, emit_monitor_started, emit_monitor_stopped, emit_error
@@ -25,7 +25,7 @@ class MonitorController:
         self.running = False
         self.lock = threading.Lock()
         self.event_emitter = get_event_emitter()
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         
         # Monitor configuration
         self.config = {
@@ -317,29 +317,30 @@ def is_monitor_running() -> bool:
 
 if __name__ == "__main__":
     # Test the monitor controller
-    import logging
-    logging.basicConfig(level=logging.INFO)
+    from logging_config import setup_logging
+    setup_logging()
+    logger = get_logger(__name__)
     
     controller = MonitorController()
     
-    print("Testing monitor controller...")
+    logger.info("Testing monitor controller...")
     
     # Test start
-    print("Starting monitor...")
+    logger.info("Starting monitor...")
     success = controller.start_monitor(room='A1', check_interval=2.0)
-    print(f"Start result: {success}")
+    logger.info(f"Start result: {success}")
     
     # Check status
     time.sleep(1)
     status = controller.get_status()
-    print(f"Status: {status}")
+    logger.info(f"Status: {status}")
     
     # Test stop
     time.sleep(5)
-    print("Stopping monitor...")
+    logger.info("Stopping monitor...")
     success = controller.stop_monitor()
-    print(f"Stop result: {success}")
+    logger.info(f"Stop result: {success}")
     
     # Final status
     status = controller.get_status()
-    print(f"Final status: {status}")
+    logger.info(f"Final status: {status}")

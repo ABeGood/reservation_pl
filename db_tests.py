@@ -10,8 +10,9 @@ from models import load_registrants_from_json, Registrant
 from database import DatabaseManager, add_new_registrant, batch_add_new_registrants, get_pending_registrations, create_reservation_for_registrant
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def load_mock_registrants_to_db(json_file_path: str = "mock_registrants.json") -> List[int]:
@@ -29,12 +30,12 @@ def load_mock_registrants_to_db(json_file_path: str = "mock_registrants.json") -
         ValueError: If JSON data is invalid
         Exception: If database operation fails
     """
-    print(f"🔄 Loading registrants from {json_file_path}...")
+    logger.info(f"🔄 Loading registrants from {json_file_path}...")
     
     try:
         # Load registrants from JSON
         registrants = load_registrants_from_json(json_file_path)
-        print(f"📄 Loaded {len(registrants)} registrants from JSON")
+        logger.info(f"📄 Loaded {len(registrants)} registrants from JSON")
         
         # Insert into database using batch function (preserves order)
         with DatabaseManager() as db:
@@ -43,22 +44,22 @@ def load_mock_registrants_to_db(json_file_path: str = "mock_registrants.json") -
         successful_inserts = len(created_ids)
         failed_inserts = len(registrants) - successful_inserts
         
-        print(f"\n📊 Summary:")
-        print(f"    ✅ Successfully inserted: {successful_inserts}")
-        print(f"    ❌ Failed inserts: {failed_inserts}")
-        print(f"    🆔 Created IDs: {created_ids}")
-        print(f"    📋 Processing order: ID {min(created_ids) if created_ids else 'N/A'} will be processed first")
+        logger.info(f"\n📊 Summary:")
+        logger.info(f"    ✅ Successfully inserted: {successful_inserts}")
+        logger.error(f"    ❌ Failed inserts: {failed_inserts}")
+        logger.info(f"    🆔 Created IDs: {created_ids}")
+        logger.info(f"    📋 Processing order: ID {min(created_ids) if created_ids else 'N/A'} will be processed first")
         
         return created_ids
         
     except FileNotFoundError as e:
-        print(f"❌ File not found: {e}")
+        logger.error(f"❌ File not found: {e}")
         raise
     except ValueError as e:
-        print(f"❌ Invalid data: {e}")
+        logger.error(f"❌ Invalid data: {e}")
         raise
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        logger.error(f"❌ Unexpected error: {e}")
         raise
 
 
@@ -66,42 +67,42 @@ def test_database_operations():
     """
     Test basic database operations.
     """
-    print("\n🧪 Testing Database Operations")
-    print("=" * 50)
+    logger.info("\n🧪 Testing Database Operations")
+    logger.info("=" * 50)
     
     try:
         # Test connection
-        print("1️⃣  Testing database connection...")
+        logger.info("1️⃣  Testing database connection...")
         with DatabaseManager() as db:
             stats = db.get_statistics()
-            print(f"   ✅ Connection successful")
-            print(f"   📊 Current registrants: {stats['general']['total_registrants']}")
-            print(f"   ⏳ Pending: {stats['general']['pending_count']}")
-            print(f"   ✅ Registered: {stats['general']['registered_count']}")
+            logger.info(f"   ✅ Connection successful")
+            logger.info(f"   📊 Current registrants: {stats['general']['total_registrants']}")
+            logger.info(f"   ⏳ Pending: {stats['general']['pending_count']}")
+            logger.info(f"   ✅ Registered: {stats['general']['registered_count']}")
         
         # Test pending registrants retrieval
-        print("\n2️⃣  Testing pending registrants retrieval...")
+        logger.info("\n2️⃣  Testing pending registrants retrieval...")
         pending = get_pending_registrations()
-        print(f"   📋 Found {len(pending)} pending registrants")
+        logger.info(f"   📋 Found {len(pending)} pending registrants")
         
         # Show some examples
         if pending:
-            print("   Examples:")
+            logger.info("   Examples:")
             for registrant in pending[:3]:  # Show first 3
-                print(f"   - {registrant}")
+                logger.info(f"   - {registrant}")
             if len(pending) > 3:
-                print(f"   ... and {len(pending) - 3} more")
+                logger.info(f"   ... and {len(pending) - 3} more")
         
         # Test filtering by month
-        print("\n3️⃣  Testing month filtering...")
+        logger.info("\n3️⃣  Testing month filtering...")
         for month in [8, 9, 10]:
             month_pending = get_pending_registrations(month=month)
             month_name = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month-1]
-            print(f"   📅 {month_name}: {len(month_pending)} pending registrants")
+            logger.info(f"   📅 {month_name}: {len(month_pending)} pending registrants")
         
     except Exception as e:
-        print(f"❌ Database test failed: {e}")
+        logger.error(f"❌ Database test failed: {e}")
         raise
 
 
@@ -111,14 +112,14 @@ def delete_tables():
     
     WARNING: This will permanently delete ALL data in the database!
     """
-    print("⚠️  WARNING: This will DELETE ALL TABLES and DATA!")
+    logger.warning("⚠️  WARNING: This will DELETE ALL TABLES and DATA!")
     confirm = input("Type 'DELETE ALL TABLES' to confirm: ").strip()
     
     if confirm != 'DELETE ALL TABLES':
-        print("❌ Operation cancelled - confirmation text did not match")
+        logger.error("❌ Operation cancelled - confirmation text did not match")
         return False
     
-    print("\n🗑️  Deleting all tables...")
+    logger.info("\n🗑️  Deleting all tables...")
     
     try:
         with DatabaseManager(auto_create_tables=False) as db:
@@ -132,12 +133,12 @@ def delete_tables():
                 cursor.execute(drop_tables_sql)
                 db.connection.commit()
                 
-            print("✅ All tables deleted successfully")
-            print("ℹ️  Tables will be recreated automatically on next database operation")
+            logger.info("✅ All tables deleted successfully")
+            logger.info("ℹ️  Tables will be recreated automatically on next database operation")
             return True
             
     except Exception as e:
-        print(f"❌ Failed to delete tables: {e}")
+        logger.error(f"❌ Failed to delete tables: {e}")
         raise
 
 
@@ -148,7 +149,7 @@ def cleanup_test_data(registrant_ids: List[int]):
     Args:
         registrant_ids (List[int]): List of registrant IDs to remove
     """
-    print(f"\n🧹 Cleaning up {len(registrant_ids)} test registrants...")
+    logger.info(f"\n🧹 Cleaning up {len(registrant_ids)} test registrants...")
     
     try:
         deleted_count = 0
@@ -156,14 +157,14 @@ def cleanup_test_data(registrant_ids: List[int]):
             for registrant_id in registrant_ids:
                 if db.delete_registrant(registrant_id):
                     deleted_count += 1
-                    print(f"  🗑️  Deleted registrant ID: {registrant_id}")
+                    logger.info(f"  🗑️  Deleted registrant ID: {registrant_id}")
                 else:
-                    print(f"  ⚠️  Registrant ID {registrant_id} not found")
+                    logger.warning(f"  ⚠️  Registrant ID {registrant_id} not found")
         
-        print(f"✅ Cleanup completed: {deleted_count}/{len(registrant_ids)} registrants deleted")
+        logger.info(f"✅ Cleanup completed: {deleted_count}/{len(registrant_ids)} registrants deleted")
         
     except Exception as e:
-        print(f"❌ Cleanup failed: {e}")
+        logger.error(f"❌ Cleanup failed: {e}")
         raise
 
 
@@ -174,14 +175,14 @@ def verify_json_format(json_file_path: str = "mock_registrants.json"):
     Args:
         json_file_path (str): Path to JSON file to verify
     """
-    print(f"🔍 Verifying JSON file: {json_file_path}")
-    print("=" * 50)
+    logger.info(f"🔍 Verifying JSON file: {json_file_path}")
+    logger.info("=" * 50)
     
     try:
         registrants = load_registrants_from_json(json_file_path)
         
-        print(f"✅ JSON format valid")
-        print(f"📊 Found {len(registrants)} registrants")
+        logger.info(f"✅ JSON format valid")
+        logger.info(f"📊 Found {len(registrants)} registrants")
         
         # Analyze data
         citizenships = {}
@@ -200,40 +201,40 @@ def verify_json_format(json_file_path: str = "mock_registrants.json"):
             month = registrant.desired_month
             months[month] = months.get(month, 0) + 1
         
-        print(f"\n📈 Data Analysis:")
-        print(f"   🌍 Citizenships:")
+        logger.info(f"\n📈 Data Analysis:")
+        logger.info(f"   🌍 Citizenships:")
         for citizenship, count in citizenships.items():
-            print(f"     - {citizenship}: {count}")
+            logger.info(f"     - {citizenship}: {count}")
         
-        print(f"   📝 Application types:")
+        logger.info(f"   📝 Application types:")
         for app_type, count in application_types.items():
-            print(f"     - {app_type}: {count}")
+            logger.info(f"     - {app_type}: {count}")
         
-        print(f"   📅 Desired months:")
+        logger.info(f"   📅 Desired months:")
         month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         for month, count in sorted(months.items()):
-            print(f"     - {month_names[month-1]}: {count}")
+            logger.info(f"     - {month_names[month-1]}: {count}")
         
         # Show sample registrant
         if registrants:
-            print(f"\n👤 Sample registrant:")
+            logger.info(f"\n👤 Sample registrant:")
             sample = registrants[0]
-            print(f"   Name: {sample.name} {sample.surname}")
-            print(f"   Citizenship: {sample.citizenship}")
-            print(f"   Email: {sample.email}")
-            print(f"   Phone: {sample.phone}")
-            print(f"   Application: {sample.application_type}")
-            print(f"   Desired month: {sample.desired_month}")
+            logger.info(f"   Name: {sample.name} {sample.surname}")
+            logger.info(f"   Citizenship: {sample.citizenship}")
+            logger.info(f"   Email: {sample.email}")
+            logger.info(f"   Phone: {sample.phone}")
+            logger.info(f"   Application: {sample.application_type}")
+            logger.info(f"   Desired month: {sample.desired_month}")
         
     except Exception as e:
-        print(f"❌ JSON verification failed: {e}")
+        logger.error(f"❌ JSON verification failed: {e}")
         raise
 
 
 def create_test_reservation_basic():
     """Create a basic reservation test."""
-    print("🎫 Creating basic reservation...")
+    logger.info("🎫 Creating basic reservation...")
     
     from models import create_registrant
     with DatabaseManager() as db:
@@ -247,21 +248,21 @@ def create_test_reservation_basic():
             desired_month=8
         )
         registrant_id = db.add_registrant(test_registrant)
-        print(f"   ✅ Created test registrant ID: {registrant_id}")
+        logger.info(f"   ✅ Created test registrant ID: {registrant_id}")
     
     reservation_id = "TEST_BASIC_001"
     success = create_reservation_for_registrant(registrant_id, reservation_id)
     if success:
-        print(f"   ✅ Basic reservation created: {reservation_id}")
+        logger.info(f"   ✅ Basic reservation created: {reservation_id}")
     else:
-        print(f"   ❌ Failed to create basic reservation")
+        logger.error(f"   ❌ Failed to create basic reservation")
     
     return registrant_id
 
 
 def create_test_reservation_detailed():
     """Create a detailed reservation with appointment data."""
-    print("🎫 Creating detailed reservation with appointment data...")
+    logger.info("🎫 Creating detailed reservation with appointment data...")
     
     from models import create_registrant
     with DatabaseManager() as db:
@@ -275,7 +276,7 @@ def create_test_reservation_detailed():
             desired_month=8
         )
         registrant_id = db.add_registrant(test_registrant)
-        print(f"   ✅ Created test registrant ID: {registrant_id}")
+        logger.info(f"   ✅ Created test registrant ID: {registrant_id}")
     
     reservation_id = "TEST_DETAILED_002"
     success_data = {
@@ -294,17 +295,17 @@ def create_test_reservation_detailed():
     
     success = create_reservation_for_registrant(registrant_id, reservation_id, success_data)
     if success:
-        print(f"   ✅ Detailed reservation created: {reservation_id}")
-        print(f"   📅 Appointment: 2025-06-25 09:00")
+        logger.info(f"   ✅ Detailed reservation created: {reservation_id}")
+        logger.info(f"   📅 Appointment: 2025-06-25 09:00")
     else:
-        print(f"   ❌ Failed to create detailed reservation")
+        logger.error(f"   ❌ Failed to create detailed reservation")
     
     return registrant_id
 
 
 def verify_reservation_data():
     """Verify all reservation data in database."""
-    print("🔍 Verifying reservation data...")
+    logger.info("🔍 Verifying reservation data...")
     
     with DatabaseManager() as db:
         verify_sql = """
@@ -322,26 +323,26 @@ def verify_reservation_data():
             results = cursor.fetchall()
             
             if not results:
-                print("   ℹ️  No test reservations found")
+                logger.info("   ℹ️  No test reservations found")
                 return
             
             for row in results:
-                print(f"   👤 {row['name']} {row['surname']} (ID: {row['id']})")
+                logger.info(f"   👤 {row['name']} {row['surname']} (ID: {row['id']})")
                 if row['reservation']:
-                    print(f"      🎫 Reservation: {row['reservation']}")
-                    print(f"      📅 Date: {row['appointment_date']}")
-                    print(f"      ⏰ Time: {row['appointment_time']}")
-                    print(f"      📆 DateTime: {row['appointment_datetime']}")
-                    print(f"      🏢 Room: {row['room']}")
-                    print(f"      🔢 Code: {row['registration_code']}")
+                    logger.info(f"      🎫 Reservation: {row['reservation']}")
+                    logger.info(f"      📅 Date: {row['appointment_date']}")
+                    logger.info(f"      ⏰ Time: {row['appointment_time']}")
+                    logger.info(f"      📆 DateTime: {row['appointment_datetime']}")
+                    logger.info(f"      🏢 Room: {row['room']}")
+                    logger.info(f"      🔢 Code: {row['registration_code']}")
                 else:
-                    print(f"      ⏳ No reservation")
-                print()
+                    logger.info(f"      ⏳ No reservation")
+                logger.info("")
 
 
 def test_malformed_datetime():
     """Test malformed datetime handling."""
-    print("🧪 Testing malformed datetime handling...")
+    logger.info("🧪 Testing malformed datetime handling...")
     
     from models import create_registrant
     with DatabaseManager() as db:
@@ -355,7 +356,7 @@ def test_malformed_datetime():
             desired_month=8
         )
         registrant_id = db.add_registrant(test_registrant)
-        print(f"   ✅ Created test registrant ID: {registrant_id}")
+        logger.info(f"   ✅ Created test registrant ID: {registrant_id}")
     
     reservation_id = "TEST_MALFORMED_003"
     malformed_data = {
@@ -366,16 +367,16 @@ def test_malformed_datetime():
     
     success = create_reservation_for_registrant(registrant_id, reservation_id, malformed_data)
     if success:
-        print("   ✅ Handled malformed data gracefully")
+        logger.info("   ✅ Handled malformed data gracefully")
     else:
-        print("   ❌ Failed to handle malformed data")
+        logger.error("   ❌ Failed to handle malformed data")
     
     return registrant_id
 
 
 def cleanup_test_reservations():
     """Clean up all test reservations."""
-    print("🧹 Cleaning up test reservations...")
+    logger.info("🧹 Cleaning up test reservations...")
     
     with DatabaseManager() as db:
         cleanup_sql = """
@@ -390,9 +391,9 @@ def cleanup_test_reservations():
             db.connection.commit()
             
             if deleted_ids:
-                print(f"   ✅ Deleted {len(deleted_ids)} test registrants: {deleted_ids}")
+                logger.info(f"   ✅ Deleted {len(deleted_ids)} test registrants: {deleted_ids}")
             else:
-                print("   ℹ️  No test registrants found to delete")
+                logger.info("   ℹ️  No test registrants found to delete")
 
 
 def interactive_menu():
@@ -436,7 +437,7 @@ def interactive_menu():
                 test_database_operations()
             elif choice == '3':
                 created_ids = load_mock_registrants_to_db()
-                print(f"ℹ️  Created registrant IDs: {created_ids}")
+                logger.info(f"ℹ️  Created registrant IDs: {created_ids}")
             elif choice == '4':
                 create_test_reservation_basic()
             elif choice == '5':
@@ -452,9 +453,9 @@ def interactive_menu():
                         ids = [int(x.strip()) for x in ids_input.split(',')]
                         cleanup_test_data(ids)
                     except ValueError:
-                        print("❌ Invalid ID format. Please enter comma-separated numbers.")
+                        logger.error("❌ Invalid ID format. Please enter comma-separated numbers.")
                 else:
-                    print("❌ No IDs provided")
+                    logger.error("❌ No IDs provided")
             elif choice == '9':
                 cleanup_test_reservations()
             elif choice == '10':
@@ -463,10 +464,10 @@ def interactive_menu():
                 main()
                 break
             else:
-                print("❌ Invalid choice. Please select 0-11.")
+                logger.error("❌ Invalid choice. Please select 0-11.")
                 
         except Exception as e:
-            print(f"❌ Operation failed: {e}")
+            logger.error(f"❌ Operation failed: {e}")
             continue
 
 
@@ -492,27 +493,27 @@ def main():
         test_database_operations()
         
         # Step 3: Load mock data
-        print(f"\n" + "=" * 60)
+        logger.info(f"\n" + "=" * 60)
         created_ids = load_mock_registrants_to_db()
         
         # Step 4: Test operations with new data
-        print(f"\n" + "=" * 60)
-        print("🔄 Re-testing with loaded data...")
+        logger.info(f"\n" + "=" * 60)
+        logger.info("🔄 Re-testing with loaded data...")
         test_database_operations()
         
         # Step 5: Optional cleanup
-        print(f"\n" + "=" * 60)
+        logger.info(f"\n" + "=" * 60)
         cleanup_choice = input("🧹 Do you want to clean up test data? (y/N): ").strip().lower()
         if cleanup_choice in ['y', 'yes']:
             cleanup_test_data(created_ids)
         else:
-            print("ℹ️  Test data kept in database")
-            print(f"   Created registrant IDs: {created_ids}")
+            logger.info("ℹ️  Test data kept in database")
+            logger.info(f"   Created registrant IDs: {created_ids}")
         
-        print(f"\n🎉 All tests completed successfully!")
+        logger.info(f"\n🎉 All tests completed successfully!")
         
     except Exception as e:
-        print(f"\n💥 Test suite failed: {e}")
+        logger.error(f"\n💥 Test suite failed: {e}")
         raise
 
 

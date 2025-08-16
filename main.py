@@ -4,27 +4,15 @@ Runs both the Telegram bot and RealTimeAvailabilityMonitor together.
 """
 
 import asyncio
-import logging
 import threading
 import time
 import os
 from dotenv import load_dotenv
 
+from logging_config import setup_logging, get_logger
 from tg_bot import TelegramBot
 from monitor_controller import get_monitor_controller
 from monitor_events_manager import get_event_queue, emit_monitor_started
-
-
-def setup_logging():
-    """Configure logging for the integrated system."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('polish_card_bot.log')
-        ]
-    )
 
 
 def main():
@@ -32,7 +20,7 @@ def main():
     load_dotenv()
     setup_logging()
     
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     logger.info("🚀 Starting Polish Card Reservation Bot System")
     
     # Check environment variables
