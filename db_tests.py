@@ -7,7 +7,7 @@ import os
 import logging
 from typing import List, Optional
 from models import load_registrants_from_json, Registrant
-from database import DatabaseManager, add_new_registrant, batch_add_new_registrants, get_pending_registrations
+from database import DatabaseManager, add_new_registrant, batch_add_new_registrants, get_pending_registrations, create_reservation_for_registrant
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -231,6 +231,170 @@ def verify_json_format(json_file_path: str = "mock_registrants.json"):
         raise
 
 
+def create_test_reservation_basic():
+    """Create a basic reservation test."""
+    print("🎫 Creating basic reservation...")
+    
+    from models import create_registrant
+    with DatabaseManager() as db:
+        test_registrant = create_registrant(
+            name="Test",
+            surname="Basic",
+            citizenship="UKRAINE",
+            email="test.basic@example.com",
+            phone="123456789",
+            application_type="ADULT",
+            desired_month=8
+        )
+        registrant_id = db.add_registrant(test_registrant)
+        print(f"   ✅ Created test registrant ID: {registrant_id}")
+    
+    reservation_id = "TEST_BASIC_001"
+    success = create_reservation_for_registrant(registrant_id, reservation_id)
+    if success:
+        print(f"   ✅ Basic reservation created: {reservation_id}")
+    else:
+        print(f"   ❌ Failed to create basic reservation")
+    
+    return registrant_id
+
+
+def create_test_reservation_detailed():
+    """Create a detailed reservation with appointment data."""
+    print("🎫 Creating detailed reservation with appointment data...")
+    
+    from models import create_registrant
+    with DatabaseManager() as db:
+        test_registrant = create_registrant(
+            name="Test",
+            surname="Detailed",
+            citizenship="UKRAINE",
+            email="test.detailed@example.com",
+            phone="987654321",
+            application_type="ADULT",
+            desired_month=8
+        )
+        registrant_id = db.add_registrant(test_registrant)
+        print(f"   ✅ Created test registrant ID: {registrant_id}")
+    
+    reservation_id = "TEST_DETAILED_002"
+    success_data = {
+        'appointment_date': '2025-06-25',
+        'appointment_time': '09:00',
+        'appointment_datetime': '2025-06-25 09:00',
+        'room': 'A2 pokoj 25',
+        'registration_code': 'REG123456',
+        'name': 'Test',
+        'surname': 'Detailed',
+        'email': 'test.detailed@example.com',
+        'phone': '987654321',
+        'citizenship': 'Ukraina',
+        'application_type': 'osoba dorosła'
+    }
+    
+    success = create_reservation_for_registrant(registrant_id, reservation_id, success_data)
+    if success:
+        print(f"   ✅ Detailed reservation created: {reservation_id}")
+        print(f"   📅 Appointment: 2025-06-25 09:00")
+    else:
+        print(f"   ❌ Failed to create detailed reservation")
+    
+    return registrant_id
+
+
+def verify_reservation_data():
+    """Verify all reservation data in database."""
+    print("🔍 Verifying reservation data...")
+    
+    with DatabaseManager() as db:
+        verify_sql = """
+        SELECT r.id, r.name, r.surname, r.reservation,
+               res.appointment_date, res.appointment_time, res.appointment_datetime,
+               res.room, res.registration_code
+        FROM registrants r
+        LEFT JOIN reservations res ON r.reservation = res.id
+        WHERE r.email LIKE 'test.%@example.com'
+        ORDER BY r.id;
+        """
+        
+        with db.connection.cursor() as cursor:
+            cursor.execute(verify_sql)
+            results = cursor.fetchall()
+            
+            if not results:
+                print("   ℹ️  No test reservations found")
+                return
+            
+            for row in results:
+                print(f"   👤 {row['name']} {row['surname']} (ID: {row['id']})")
+                if row['reservation']:
+                    print(f"      🎫 Reservation: {row['reservation']}")
+                    print(f"      📅 Date: {row['appointment_date']}")
+                    print(f"      ⏰ Time: {row['appointment_time']}")
+                    print(f"      📆 DateTime: {row['appointment_datetime']}")
+                    print(f"      🏢 Room: {row['room']}")
+                    print(f"      🔢 Code: {row['registration_code']}")
+                else:
+                    print(f"      ⏳ No reservation")
+                print()
+
+
+def test_malformed_datetime():
+    """Test malformed datetime handling."""
+    print("🧪 Testing malformed datetime handling...")
+    
+    from models import create_registrant
+    with DatabaseManager() as db:
+        test_registrant = create_registrant(
+            name="Test",
+            surname="Malformed",
+            citizenship="UKRAINE",
+            email="test.malformed@example.com",
+            phone="555666777",
+            application_type="ADULT",
+            desired_month=8
+        )
+        registrant_id = db.add_registrant(test_registrant)
+        print(f"   ✅ Created test registrant ID: {registrant_id}")
+    
+    reservation_id = "TEST_MALFORMED_003"
+    malformed_data = {
+        'appointment_time': 'invalid-time',
+        'appointment_datetime': 'not-a-date',
+        'appointment_date': '2025-13-45',
+    }
+    
+    success = create_reservation_for_registrant(registrant_id, reservation_id, malformed_data)
+    if success:
+        print("   ✅ Handled malformed data gracefully")
+    else:
+        print("   ❌ Failed to handle malformed data")
+    
+    return registrant_id
+
+
+def cleanup_test_reservations():
+    """Clean up all test reservations."""
+    print("🧹 Cleaning up test reservations...")
+    
+    with DatabaseManager() as db:
+        cleanup_sql = """
+        DELETE FROM registrants 
+        WHERE email LIKE 'test.%@example.com'
+        RETURNING id;
+        """
+        
+        with db.connection.cursor() as cursor:
+            cursor.execute(cleanup_sql)
+            deleted_ids = [row['id'] for row in cursor.fetchall()]
+            db.connection.commit()
+            
+            if deleted_ids:
+                print(f"   ✅ Deleted {len(deleted_ids)} test registrants: {deleted_ids}")
+            else:
+                print("   ℹ️  No test registrants found to delete")
+
+
 def interactive_menu():
     """
     Interactive menu for database testing operations.
@@ -250,12 +414,17 @@ def interactive_menu():
         print("1. 🔍 Verify JSON format")
         print("2. 🧪 Test database operations")
         print("3. 📄 Load mock registrants from JSON")
-        print("4. 🧹 Clean up test data (by IDs)")
-        print("5. 🗑️  DELETE ALL TABLES (DANGER!)")
-        print("6. 🔄 Run full test suite")
+        print("4. 🎫 Create basic reservation")
+        print("5. 🎯 Create detailed reservation") 
+        print("6. 🔍 Verify reservation data")
+        print("7. 🧪 Test malformed datetime")
+        print("8. 🧹 Clean up test data (by IDs)")
+        print("9. 🧹 Clean up test reservations")
+        print("10. 🗑️  DELETE ALL TABLES (DANGER!)")
+        print("11. 🔄 Run full test suite")
         print("0. ❌ Exit")
         
-        choice = input("\nSelect operation (0-6): ").strip()
+        choice = input("\nSelect operation (0-11): ").strip()
         
         try:
             if choice == '0':
@@ -269,6 +438,14 @@ def interactive_menu():
                 created_ids = load_mock_registrants_to_db()
                 print(f"ℹ️  Created registrant IDs: {created_ids}")
             elif choice == '4':
+                create_test_reservation_basic()
+            elif choice == '5':
+                create_test_reservation_detailed()
+            elif choice == '6':
+                verify_reservation_data()
+            elif choice == '7':
+                test_malformed_datetime()
+            elif choice == '8':
                 ids_input = input("Enter registrant IDs to delete (comma-separated): ").strip()
                 if ids_input:
                     try:
@@ -278,13 +455,15 @@ def interactive_menu():
                         print("❌ Invalid ID format. Please enter comma-separated numbers.")
                 else:
                     print("❌ No IDs provided")
-            elif choice == '5':
+            elif choice == '9':
+                cleanup_test_reservations()
+            elif choice == '10':
                 delete_tables()
-            elif choice == '6':
+            elif choice == '11':
                 main()
                 break
             else:
-                print("❌ Invalid choice. Please select 0-6.")
+                print("❌ Invalid choice. Please select 0-11.")
                 
         except Exception as e:
             print(f"❌ Operation failed: {e}")

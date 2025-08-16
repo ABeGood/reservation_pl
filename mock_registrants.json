@@ -1,29 +1,29 @@
 [
   {
-    "name": "Oksana",
-    "surname": "Petrenko",
+    "name": "Maria",
+    "surname": "Nowak",
     "citizenship": "UKRAINE",
-    "email": "o.petrenko66@gmail.com",
-    "phone": "776895112",
+    "email": "m.nowak2024@gmail.com",
+    "phone": "554332211",
     "application_type": "ADULT",
     "desired_month": 9
   },
   {
-    "name": "Dmitri",
-    "surname": "Volkov",
+    "name": "Viktor",
+    "surname": "Petrov",
     "citizenship": "RUSSIA",
-    "email": "volkov068d@gmail.com",
-    "phone": "555123456",
+    "email": "v.petrov88@gmail.com",
+    "phone": "667554433",
     "application_type": "ADULT",
     "desired_month": 7
   },
   {
-    "name": "Elena",
-    "surname": "Kovalenko",
+    "name": "Anna",
+    "surname": "Mikhailova",
     "citizenship": "BELARUS",
-    "email": "e.kovalenko2024@gmail.com",
-    "phone": "667889123",
-    "application_type": "ADULT",
+    "email": "a.mikhailova.a@gmail.com",
+    "phone": "778899001",
+    "application_type": "ADULT_WITH_CHILDREN",
     "desired_month": 8
   }
 ]

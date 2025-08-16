@@ -1,0 +1,17 @@
+'      <html>\n<head>\n<meta http-equiv="content-type" content="text/html; charset=utf-8" />\n<link href="style.css" rel="stylesheet" type="text/css" />\n</head>\n<body>\n\t\n<a href=\'./rezerwacje.php\'>wstecz</a><br />\nkod z obrazka przepisany przez ciebie jest nieprawidłowy!!'
+
+
+
+'      <html>\n<head>\n<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />\n<link href="style.css" rel="stylesheet" type="text/css" />\n</head>\n<body>\n\t\n Błąd rezerwacji!! Sprawdź ponownie dostęność godzin dla wybrnej daty.<a href=\'./rezerwacje.php\'>Wstecz</a><br />\n</body>\n</html>\n\n '
+
+
+
+'      <html>\n<head>\n<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />\n<link href="style.css" rel="stylesheet" type="text/css" />\n</head>\n<body>\n\t\n<table style=\'border: 1px solid black; width:340px\'><tr><td><center><img src="graf\\grafika.png" alt="Logo WMUW w Olsztynie" width="170" height="40" align="rightt"><hr width="285" color="#545454"/>Wydział Spraw Obywatelskich i Cudzoziemców<br />\nRezerwacja terminu wizyty - Obywatelstwo<br />\nPrzedłużenie ważności, wydanie duplikatu, zmiana danych Karty Polaka<br />\n<hr width="285" color="#545454"/></center><p class="a">Dane rejestracyjne:&nbsp<t class=\'text\'>Svetlana &nbsp Ivanova</t><br />\nAdres e-mail-<t class=\'text\'>&nbspgriss7473@gmail.com</t><br />\nTelefon-<t class=\'text\'>&nbsp555987654</t><br />\nData rezerwacji,godzina,stanowisko-<br><t class=\'text\'>2025-07-09 &nbsp  09:00 &nbsp A2 pokoj 25</t><br />\nObywatelstwo -<t class=\'text\'>&nbsp</t><br />\nDotyczy -<t class=\'text\'>&nbsposoba dorosła</t><br />\nKod zgłoszenia-<t class=\'text\'>&nbsp9569bf</t><br />\n</p><center><hr width="285" color="#545454"/><a href="#" onclick="javascript:window.print()">Drukuj | </a><a href=\'./rezerwacje.php\'>Główna |</a><a href=\'./pokoj_A2.php\'>Wstecz</a><br />\n</center><hr width="285" color="#545454"/></td></tr></table></body>\n</html>\n\n '
+
+
+
+{'success': True, 'name': 'Elena', 'surname': 'Kovalenko', 'email': 'e.kovalenko2024@gmail.com', 'phone': '667889123', 'appointment_datetime': '2025-07-10 09:00', 'appointment_date': '2025-07-10', 'appointment_time': '09:00', 'room': 'A2 pokoj 25', 'citizenship': 'Białoruś', 'application_type': 'osoba dorosła', 'registration_code': 'a4b34f'}
+
+appointment_time
+
+reservations

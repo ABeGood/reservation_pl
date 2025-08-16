@@ -371,16 +371,15 @@ class DatabaseManager:
         self._ensure_connection()
         
         if success_data:
-            # Parse datetime if provided as string (treat as local timezone)
+            # Parse datetime if provided as string (Polish timezone - no automatic conversion)
             appointment_datetime = None
             if success_data.get('appointment_datetime'):
                 try:
-                    # Parse as naive datetime (local timezone)
+                    # Parse as naive datetime and keep it naive (no timezone conversion)
                     naive_dt = datetime.strptime(
                         success_data['appointment_datetime'], 
                         '%Y-%m-%d %H:%M'
                     )
-                    # Keep it naive to avoid timezone conversion by PostgreSQL
                     appointment_datetime = naive_dt
                 except ValueError:
                     logger.warning(f"Invalid datetime format: {success_data['appointment_datetime']}")
@@ -389,12 +388,14 @@ class DatabaseManager:
             appointment_time = None
             if success_data.get('appointment_time'):
                 try:
-                    appointment_time = datetime.strptime(
-                        success_data['appointment_time'], 
-                        '%H:%M'
-                    ).time()
-                except ValueError:
-                    logger.warning(f"Invalid time format: {success_data['appointment_time']}")
+                    # Handle both HH:MM and H:MM formats
+                    time_str = success_data['appointment_time'].strip()
+                    if ':' in time_str:
+                        appointment_time = datetime.strptime(time_str, '%H:%M').time()
+                    else:
+                        logger.warning(f"Time format missing colon: {time_str}")
+                except (ValueError, AttributeError) as e:
+                    logger.warning(f"Invalid time format '{success_data.get('appointment_time')}': {e}")
             
             # Parse appointment_date if provided as string
             appointment_date = None

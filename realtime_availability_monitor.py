@@ -500,7 +500,7 @@ class RealTimeAvailabilityMonitor:
                     additional_wait = 0.3  # Quick check when slots found
                     print(f"🔥 Slots available! Quick cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s...")
                 else:
-                    additional_wait = 2.0  # Longer wait when no slots
+                    additional_wait = 0.3  # Longer wait when no slots
                     print(f"Cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s before next cycle...")
                 
                 time.sleep(additional_wait)
