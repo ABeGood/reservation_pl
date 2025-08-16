@@ -16,6 +16,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from database import get_pending_registrations, create_reservation_for_registrant
 from ajax2py import send_registration_request_with_retry
+from monitor_events_manager import (
+    get_event_emitter,
+    emit_error,
+    emit_slot_found,
+    emit_registration_success,
+    emit_registration_failed,
+    emit_status_update
+)
 import base64
 
 class RealTimeAvailabilityMonitor:
@@ -43,6 +51,41 @@ class RealTimeAvailabilityMonitor:
         self.last_db_check = None
         # self.db_check_interval = 1800  # Check database every n seconds
         self.db_check_interval = 10  # Check database every n seconds
+        
+        # Event emitter for Telegram notifications
+        self.event_emitter = get_event_emitter()
+    
+    def get_current_stats(self):
+        """Get current statistics (thread-safe)."""
+        with self.stats_lock:
+            return self.stats.copy()
+    
+    def refresh_pending_registrants(self):
+        """Refresh pending registrants from database."""
+        try:
+            self.pending_registrants = get_pending_registrations()
+            self.target_months = {r.desired_month for r in self.pending_registrants}
+            
+            with self.stats_lock:
+                self.stats['pending_registrants'] = len(self.pending_registrants)
+                self.stats['target_months'] = list(self.target_months)
+                self.stats['last_registrant_check'] = datetime.now().isoformat()
+            
+            print(f"🗄️ Database refresh: {len(self.pending_registrants)} pending registrants for months {list(self.target_months)}")
+            return True
+        except Exception as e:
+            error_msg = f"Failed to refresh database: {str(e)}"
+            print(f"❌ {error_msg}")
+            emit_error(error_msg, {'exception': str(e)})
+            return False
+    
+    def run_enhanced_monitoring(self, check_interval:float, auto_registration:bool):
+        """Enhanced monitoring with event emission. Leverages existing start_monitoring()."""
+        print("🚀 Starting enhanced monitoring with Telegram notifications...")
+        
+        # Simply delegate to the existing start_monitoring method
+        # which already has all the functionality we need
+        self.start_monitoring(max_duration_minutes=None)
         
     def get_captcha_image(self, session_id=None):
         """Fetch CAPTCHA image from server and return as base64 string."""
@@ -139,6 +182,12 @@ class RealTimeAvailabilityMonitor:
                     )
                     
                     if success:
+                        # Emit registration success event
+                        emit_registration_success(
+                            registrant_data=registrant_data,
+                            slot_data=slot
+                        )
+                        
                         attempt_info = f" (attempt {registration_result.get('attempt', 1)}/{registration_result.get('max_retries', 3) + 1})" if registration_result.get('attempt', 1) > 1 else ""
                         print(f"✅ REGISTRATION SUCCESS: {matching_registrant.name} {matching_registrant.surname}{attempt_info}")
                         
@@ -167,18 +216,37 @@ class RealTimeAvailabilityMonitor:
                         self.target_months = set(r.desired_month for r in self.pending_registrants)
                         
                     else:
-                        print(f"❌ Database update failed for {matching_registrant.name}")
+                        error_msg = f"Database update failed for {matching_registrant.name}"
+                        print(f"❌ {error_msg}")
+                        emit_registration_failed(
+                            registrant_data=registrant_data,
+                            slot_data=slot,
+                            error=error_msg
+                        )
                         
                 else:
                     attempt_info = f" (failed after {registration_result.get('attempt', 1)} attempts)" if registration_result.get('attempt') else ""
                     error_msg = registration_result.get('message') or registration_result.get('error', 'Unknown error')
-                    print(f"❌ Registration failed{attempt_info}: {error_msg}")
+                    full_error_msg = f"Registration failed{attempt_info}: {error_msg}"
+                    print(f"❌ {full_error_msg}")
+                    
+                    emit_registration_failed(
+                        registrant_data=registrant_data,
+                        slot_data=slot,
+                        error=full_error_msg
+                    )
                     
                 # Be nice to server between attempts
                 time.sleep(0.2)
                 
             except Exception as e:
-                print(f"❌ Registration error for {matching_registrant.name}: {e}")
+                error_msg = f"Registration error for {matching_registrant.name}: {str(e)}"
+                print(f"❌ {error_msg}")
+                emit_registration_failed(
+                    registrant_data=matching_registrant.to_registration_data(),
+                    slot_data=slot,
+                    error=error_msg
+                )
                 continue
         
         if successful_registrations:
@@ -427,7 +495,7 @@ class RealTimeAvailabilityMonitor:
             }
         }
     
-    def start_monitoring(self, max_duration_minutes=None):
+    def start_monitoring(self, max_duration_minutes=None, check_interval:float=0.5, auto_registration:bool=True):
         """Start continuous monitoring with database-aware smart scheduling."""
         print("🚀 Starting smart real-time availability monitoring with AUTO-REGISTRATION...")
         print(f"Monitoring endpoint: {self.base_url}{self.endpoint}")
@@ -450,42 +518,64 @@ class RealTimeAvailabilityMonitor:
                 cycle_count += 1
                 cycle_start = time.time()
 
-                # Check database for new/removed registrants periodically
-                if self.should_check_database():
-                    has_registrants = self.check_pending_registrants()
-                    if not has_registrants:
-                        wait_cycles += 1
-                        if wait_cycles == 1:
-                            print("⏸️  No pending registrants - entering standby mode")
-                        print(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
-                        time.sleep(self.db_check_interval+10)  # AG: Not very nice!
-                        continue
-                    elif wait_cycles > 0:
-                        print("🎉 Found pending registrants - resuming active monitoring!")
-                        wait_cycles = 0
+                try:
+                    # Check database for new/removed registrants periodically
+                    if self.should_check_database():
+                        has_registrants = self.check_pending_registrants()
+                        if not has_registrants:
+                            wait_cycles += 1
+                            if wait_cycles == 1:
+                                print("⏸️  No pending registrants - entering standby mode")
+                            print(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
+                            time.sleep(self.db_check_interval+10)  # AG: Not very nice!
+                            continue
+                        elif wait_cycles > 0:
+                            print("🎉 Found pending registrants - resuming active monitoring!")
+                            wait_cycles = 0
 
-                # Get available dates (filtered by target months)
-                self.available_dates = self.get_available_dates()
+                    # Get available dates (filtered by target months)
+                    self.available_dates = self.get_available_dates()
+                    
+                    # Check dates (will skip server calls if no dates)
+                    result = self.get_timeslots()
                 
-                # Check dates (will skip server calls if no dates)
-                result = self.get_timeslots()
+                except Exception as e:
+                    error_msg = f"Error during monitoring cycle: {str(e)}"
+                    print(f"❌ {error_msg}")
+                    emit_error(error_msg, {'exception': str(e)})
+                    time.sleep(1)  # Wait before retrying
+                    continue
                 
                 # Attempt auto-registration if slots are available
                 if result['total_available_slots'] > 0:
                     print(f"🔥 SLOTS DETECTED! Attempting auto-registration...")
-                    successful_registrations = self.attempt_auto_registration(result['registration_data'])
                     
-                    if successful_registrations:
-                        # Refresh registrant list after successful registrations
-                        print("🔄 Refreshing pending registrants after successful registrations...")
-                        self.check_pending_registrants()
+                    # Emit slot found event
+                    if result.get('slots_found', False):
+                        emit_slot_found(
+                            result['registration_data'], 
+                            f"Found {result['total_available_slots']} slots!"
+                        )
+                    
+                    if auto_registration:
+                        successful_registrations = self.attempt_auto_registration(result['registration_data'])
                         
-                        # If no more pending registrants, we can reduce frequency
-                        if not self.pending_registrants:
-                            print("🎉 All registrants have been registered! Switching to standby mode...")
+                        if successful_registrations:
+                            # Refresh registrant list after successful registrations
+                            print("🔄 Refreshing pending registrants after successful registrations...")
+                            self.check_pending_registrants()
+                            
+                            # If no more pending registrants, we can reduce frequency
+                            if not self.pending_registrants:
+                                print("🎉 All registrants have been registered! Switching to standby mode...")
                 
                 # Show current status
                 self.print_status()
+                
+                # Emit status updates periodically
+                # with self.stats_lock:
+                #     if self.stats['checks_performed'] % 20 == 0:  # Every 20 checks
+                #         emit_status_update(self.stats.copy())
                 
                 # Check max duration
                 if max_duration_minutes:
@@ -494,16 +584,7 @@ class RealTimeAvailabilityMonitor:
                         print(f"\n⏰ Stopping after {max_duration_minutes} minutes")
                         break
                 
-                # Adaptive wait time based on results
-                cycle_duration = time.time() - cycle_start
-                if result['total_available_slots'] > 0:
-                    additional_wait = 0.3  # Quick check when slots found
-                    print(f"🔥 Slots available! Quick cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s...")
-                else:
-                    additional_wait = 0.3  # Longer wait when no slots
-                    print(f"Cycle {cycle_count} completed in {cycle_duration:.1f}s, waiting {additional_wait:.1f}s before next cycle...")
-                
-                time.sleep(additional_wait)
+                time.sleep(check_interval)
                 
         except KeyboardInterrupt:
             print("\n🛑 Monitoring stopped by user")
