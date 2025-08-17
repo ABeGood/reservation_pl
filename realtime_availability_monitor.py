@@ -54,8 +54,7 @@ class RealTimeAvailabilityMonitor:
         self.pending_registrants = []
         self.target_months = set()
         self.last_db_check = None
-        # self.db_check_interval = 1800  # Check database every n seconds
-        self.db_check_interval = 10  # Check database every n seconds
+        self.db_check_interval = 1800  # Check database every n seconds
         
         # Event emitter for Telegram notifications
         self.event_emitter = get_event_emitter()

@@ -151,7 +151,7 @@ class TelegramBot:
                 stats = event.data.get('final_stats', {})
                 message = f"{icon} *MONITOR STOPPED*\n"
                 if stats:
-                    message += f"📊 Checks: {stats.get('checks_performed', 0)}\n"
+                    message += f"📊 Day checks: {stats.get('checks_performed', 0)}\n"
                     message += f"🎯 Slots: {stats.get('slots_found', 0)}"
                 
             else:
@@ -279,8 +279,8 @@ class TelegramBot:
                 
                 for i, registrant in enumerate(pending[:10], 1):  # Limit to first 10
                     response += f"{i}. {registrant.name} {registrant.surname}\n"
-                    response += f"   📧 {registrant.email}\n"
-                    response += f"   📅 Wants month: {registrant.desired_month}\n\n"
+                    # response += f"   📧 {registrant.email}\n"
+                    response += f"   📅 Registration month: {registrant.desired_month}\n\n"
                 
                 if len(pending) > 10:
                     response += f"... and {len(pending) - 10} more\n"
@@ -336,9 +336,11 @@ class TelegramBot:
             success = start_monitor(room=room, check_interval=interval)
             
             if success:
-                await self.bot.reply_to(msg, f"🚀 Monitor started for room {room} (interval: {interval}s)")
+                self.logger.info(f"🚀 Monitor started for room {room} (interval: {interval}s)")
             else:
                 await self.bot.reply_to(msg, "❌ Failed to start monitor. Check logs for details.")
+                self.logger.error("❌ Failed to start monitor. Check logs for details.")
+
 
         @self.bot.message_handler(commands=['stop_monitor'])
         async def handle_stop_monitor(msg: Message):
@@ -354,9 +356,10 @@ class TelegramBot:
             success = stop_monitor()
             
             if success:
-                await self.bot.reply_to(msg, "⏹️ Monitor stopped successfully.")
+                self.logger.info("⏹️ Monitor stopped successfully.")
             else:
                 await self.bot.reply_to(msg, "❌ Failed to stop monitor. Check logs for details.")
+                self.logger.error("❌ Failed to stop monitor. Check logs for details.")
 
         @self.bot.message_handler(commands=['restart_monitor'])
         async def handle_restart_monitor(msg: Message):
@@ -373,6 +376,7 @@ class TelegramBot:
                 await self.bot.reply_to(msg, "✅ Monitor restarted successfully.")
             else:
                 await self.bot.reply_to(msg, "❌ Failed to restart monitor. Check logs for details.")
+                self.logger.error("❌ Failed to restart monitor. Check logs for details.")
 
         @self.bot.message_handler(commands=['refresh_db'])
         async def handle_refresh_db(msg: Message):

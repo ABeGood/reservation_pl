@@ -96,7 +96,7 @@ class MonitorController:
             }
     
     def start_monitor(self, room: str = 'A1', check_interval: float = 0.5, 
-                     auto_registration: bool = True, db_check_interval: int = 10) -> bool:
+                     auto_registration: bool = True, db_check_interval: int = 1800) -> bool:
         """
         Start the availability monitor.
         
