@@ -522,7 +522,6 @@ class RealTimeAvailabilityMonitor:
                             if wait_cycles == 1:
                                 logger.info("⏸️  No pending registrants - entering standby mode")
                             logger.info(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
-                            # time.sleep(self.db_check_interval+10)  # AG: Not very nice!
                             if self.stop_event.wait(timeout=self.db_check_interval+10):
                                 break
                             continue
@@ -581,7 +580,7 @@ class RealTimeAvailabilityMonitor:
                         logger.info(f"\n⏰ Stopping after {max_duration_minutes} minutes")
                         break
                 
-                if self.stop_event.wait(timeout=0.5):
+                if self.stop_event.wait(timeout=check_interval):
                     break
 
             self.stop_event.set()
