@@ -292,7 +292,7 @@ def get_monitor_controller() -> MonitorController:
 
 # Convenience functions
 def start_monitor(room: str = 'A1', check_interval: float = 0.5, 
-                 auto_registration: bool = True, db_check_interval: int = 10) -> bool:
+                 auto_registration: bool = True, db_check_interval: int = 1800) -> bool:
     """Start monitor using global controller."""
     return get_monitor_controller().start_monitor(room, check_interval, auto_registration, db_check_interval)
 
