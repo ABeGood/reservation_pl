@@ -388,6 +388,9 @@ class RealTimeAvailabilityMonitor:
         Returns structured timeslot data ready for registration process."""
         now = datetime.now().strftime('%H:%M:%S')
         
+        # Clear previous results to ensure we only return current cycle data
+        self.results = {}
+        
         # Skip server calls if no available dates
         if not self.available_dates:
             if verbose:
