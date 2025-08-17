@@ -42,6 +42,15 @@ class TelegramBot:
             except ValueError:
                 pass
         
+        # Admin group ID
+        self.admin_group_id = None
+        admin_group_id = os.environ.get("TELEGRAM_ADMIN_GROUP_ID")
+        if admin_group_id:
+            try:
+                self.admin_group_id = int(admin_group_id)
+            except ValueError:
+                pass
+        
         from logging_config import get_logger
         self.logger = get_logger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -51,6 +60,13 @@ class TelegramBot:
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
+
+        # Log configuration
+        self.logger.info(f"TelegramBot initialized with {len(self.admin_users)} admin users")
+        if self.admin_group_id:
+            self.logger.info(f"Admin group configured: {self.admin_group_id}")
+        else:
+            self.logger.info("No admin group configured")
 
         self.register_handlers()
 
@@ -91,11 +107,16 @@ class TelegramBot:
             # Send to admin users
             for admin_id in self.admin_users:
                 await self._send_event_notification(admin_id, event)
+            
+            # Send to admin group if configured
+            if self.admin_group_id:
+                await self._send_event_notification(self.admin_group_id, event)
+                self.logger.debug(f"Event {event.event_type.value} sent to admin group {self.admin_group_id}")
         except Exception as e:
             self.logger.error(f"Error handling event {event.event_type}: {e}")
 
-    async def _send_event_notification(self, user_id: int, event: MonitorEvent):
-        """Send event notification to specific user."""
+    async def _send_event_notification(self, chat_id: int, event: MonitorEvent):
+        """Send event notification to specific user or group."""
         try:
             # Format message based on event type
             if event.event_type == EventType.ERROR:
@@ -144,10 +165,12 @@ class TelegramBot:
                 # Generic message
                 message = f"ℹ️ {event.message}"
             
-            await self.bot.send_message(user_id, message, parse_mode='Markdown')
+            await self.bot.send_message(chat_id, message, parse_mode='Markdown')
             
         except Exception as e:
-            self.logger.error(f"Failed to send notification to {user_id}: {e}")
+            # Determine if it's a group or user for better logging
+            chat_type = "group" if chat_id < 0 else "user"
+            self.logger.error(f"Failed to send notification to {chat_type} {chat_id}: {e}")
 
     async def _run_bot_async(self):
         """Async wrapper to start both bot polling and event processing."""
