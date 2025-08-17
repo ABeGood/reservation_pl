@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.tox
+.venv
+.env
+.venv/
+venv/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Data files (should be persisted via volumes)
+*.json
+*.db
+*.sqlite
+*.sqlite3
+
+# Documentation
+*.md
+documentation/
+
+# Web pages (static files not needed in production)
+web_pages/
+
+# Jupyter notebooks
+*.ipynb
+
+# Test files
+*_tests.py
+test_*
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+
+# Optimization docs
+optimization-principles.md
+project_flowchart.md
