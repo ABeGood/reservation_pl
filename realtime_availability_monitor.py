@@ -46,7 +46,9 @@ class RealTimeAvailabilityMonitor:
             'target_months': [],
             'last_registrant_check': None,
             'successful_registrations': 0,
-            'registration_attempts': 0
+            'registration_attempts': 0,
+            'last_status_log': None,
+            'cycle_duration': 0
         }
         self.stats_lock = threading.Lock()
         self.pending_registrants = []
@@ -290,9 +292,10 @@ class RealTimeAvailabilityMonitor:
             return True
         return (datetime.now() - self.last_db_check).seconds >= self.db_check_interval
 
-    def extract_datepicker_config(self):
+    def extract_datepicker_config(self, verbose=False):
         """Dynamically extract datepicker configuration from the web page."""
-        logger.info(f"🔍 Extracting datepicker configuration from {self.page_url}...")
+        if verbose:
+            logger.info(f"🔍 Extracting datepicker configuration from {self.page_url}...")
         
         try:
             response = requests.get(self.page_url, timeout=10)
@@ -308,7 +311,8 @@ class RealTimeAvailabilityMonitor:
                 # Extract dates from the array
                 dates_str = disabled_days_match.group(1)
                 disabled_days = re.findall(r'"(\d{4}-\d{2}-\d{2})"', dates_str)
-                logger.info(f"📅 Found {len(disabled_days)} disabled days")
+                if verbose:
+                    logger.info(f"📅 Found {len(disabled_days)} disabled days")
             
             # Extract minDate and maxDate
             min_date_match = re.search(r'minDate:\s*new Date\("(\d{4}/\d{2}/\d{2})"\)', html_content)
@@ -324,8 +328,9 @@ class RealTimeAvailabilityMonitor:
             min_date = datetime.strptime(min_date_str, "%Y-%m-%d")
             max_date = datetime.strptime(max_date_str, "%Y-%m-%d")
             
-            logger.info(f"📅 Date range: {min_date_str} to {max_date_str}")
-            logger.info(f"🚫 Disabled days: {len(disabled_days)} dates")
+            if verbose:
+                logger.info(f"📅 Date range: {min_date_str} to {max_date_str}")
+                logger.info(f"🚫 Disabled days: {len(disabled_days)} dates")
             
             return {
                 'min_date': min_date,
@@ -335,7 +340,8 @@ class RealTimeAvailabilityMonitor:
             
         except Exception as e:
             logger.error(f"❌ Error extracting datepicker config: {e}")
-            logger.info("Using fallback configuration...")
+            if verbose:
+                logger.info("Using fallback configuration...")
             # Fallback to reasonable defaults
             return {
                 'min_date': datetime.now(),
@@ -343,13 +349,14 @@ class RealTimeAvailabilityMonitor:
                 'disabled_days': []
             }
     
-    def get_available_dates(self):
+    def get_available_dates(self, verbose=False):
         """Get available dates filtered by registrant desired months."""
         if not self.target_months:
-            logger.info("⏸️  No target months - no pending registrants")
+            if verbose:
+                logger.info("⏸️  No target months - no pending registrants")
             return []
             
-        config = self.extract_datepicker_config()
+        config = self.extract_datepicker_config(verbose=verbose)
         available_dates = []
         
         # Start from today, not from datepicker minDate
@@ -357,8 +364,9 @@ class RealTimeAvailabilityMonitor:
         current_date = max(config['min_date'].date(), today)  # Use today if it's later than minDate
         current_date = datetime.combine(current_date, datetime.min.time())  # Convert back to datetime
         
-        logger.info(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
-        logger.info(f"🎯 Filtering for target months: {sorted(self.target_months)}")
+        if verbose:
+            logger.info(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
+            logger.info(f"🎯 Filtering for target months: {sorted(self.target_months)}")
         
         while current_date <= config['max_date']:
             date_str = current_date.strftime("%Y-%m-%d")
@@ -371,18 +379,20 @@ class RealTimeAvailabilityMonitor:
             
             current_date += timedelta(days=1)
         
-        logger.info(f"ℹ️  Days to check: {', '.join(available_dates[:10])}{'...' if len(available_dates) > 10 else ''}")
-        logger.info(f"✅ Found {len(available_dates)} potentially available dates in target months")
+        if verbose:
+            logger.info(f"ℹ️  Days to check: {', '.join(available_dates[:10])}{'...' if len(available_dates) > 10 else ''}")
+            logger.info(f"✅ Found {len(available_dates)} potentially available dates in target months")
         return available_dates
     
-    def get_timeslots(self):
+    def get_timeslots(self, verbose=False):
         """Single sweep through all available dates using parallel processing.
         Returns structured timeslot data ready for registration process."""
         now = datetime.now().strftime('%H:%M:%S')
         
         # Skip server calls if no available dates
         if not self.available_dates:
-            logger.info(f"[{now}] ⏸️  No dates to check - skipping server calls")
+            if verbose:
+                logger.info(f"[{now}] ⏸️  No dates to check - skipping server calls")
             return {
                 'slots_found': False,
                 'total_available_slots': 0,
@@ -395,8 +405,9 @@ class RealTimeAvailabilityMonitor:
                 }
             }
         
-        logger.info(f"[{now}] Checking {len(self.available_dates)} dates in parallel...")
-        logger.info(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
+        if verbose:
+            logger.info(f"[{now}] Checking {len(self.available_dates)} dates in parallel...")
+            logger.info(f"ℹ️  Checking dates: {', '.join(self.available_dates[:5])}{'...' if len(self.available_dates) > 5 else ''}")
         
         new_slots_found = False
         max_workers = min(8, len(self.available_dates))  # Use 8 workers max, or fewer if less dates
@@ -429,7 +440,8 @@ class RealTimeAvailabilityMonitor:
                         buffer_time = buffer_datetime.strftime("%H:%M")
                         slots = [slot for slot in slots if slot > buffer_time]
                     
-                    logger.info(f"ℹ️  Completed {date_str} ({completed_count}/{total_dates}) - {len(slots)} slots")
+                    if verbose:
+                        logger.info(f"ℹ️  Completed {date_str} ({completed_count}/{total_dates}) - {len(slots)} slots")
                     
                     # Track changes
                     if slots:
@@ -453,7 +465,8 @@ class RealTimeAvailabilityMonitor:
                     logger.error(f"❌ Error checking {future_to_date[future]}: {e}")
         
         self.stats['last_check'] = datetime.now().isoformat()
-        logger.info(f"✅ Parallel check completed: {completed_count}/{total_dates} dates processed")
+        if verbose:
+            logger.info(f"✅ Parallel check completed: {completed_count}/{total_dates} dates processed")
         
         # Return structured data ready for registration
         registration_ready_slots = []
@@ -530,10 +543,10 @@ class RealTimeAvailabilityMonitor:
                             wait_cycles = 0
 
                     # Get available dates (filtered by target months)
-                    self.available_dates = self.get_available_dates()
+                    self.available_dates = self.get_available_dates(verbose=False)
                     
                     # Check dates (will skip server calls if no dates)
-                    result = self.get_timeslots()
+                    result = self.get_timeslots(verbose=False)
                 
                 except Exception as e:
                     error_msg = f"Error during monitoring cycle: {str(e)}"
@@ -565,8 +578,14 @@ class RealTimeAvailabilityMonitor:
                             if not self.pending_registrants:
                                 logger.info("🎉 All registrants have been registered! Switching to standby mode...")
                 
-                # Show current status
-                self.print_status()
+                # Update cycle duration
+                cycle_end = time.time()
+                cycle_duration = cycle_end - cycle_start
+                with self.stats_lock:
+                    self.stats['cycle_duration'] = cycle_duration
+                
+                # Show current status (limited to once per minute)
+                self.print_status_if_needed()
                 
                 # Emit status updates periodically
                 # with self.stats_lock:
@@ -593,15 +612,36 @@ class RealTimeAvailabilityMonitor:
             self.save_results()
             logger.info("🧹 start_monitoring cleanup completed")
     
+    def print_status_if_needed(self):
+        """Print current monitoring status once per minute."""
+        now = datetime.now()
+        
+        # Only log status once per minute
+        last_log = self.stats.get('last_status_log')
+        should_log = (last_log is None or 
+                     (now - datetime.fromisoformat(last_log)).seconds >= 60)
+        
+        if should_log:
+            with self.stats_lock:
+                self.stats['last_status_log'] = now.isoformat()
+            
+            # Show detailed info in the periodic status update
+            if len(self.pending_registrants) > 0:
+                logger.info("📊 Periodic status update:")
+                self.get_available_dates(verbose=True)
+            
+            self.print_status()
+    
     def print_status(self):
         """Print current monitoring status with registrant information."""
         now = datetime.now().strftime('%H:%M:%S')
         available_count = len(self.results)
         total_slots = sum(len(slots) for slots in self.results.values())
         pending_count = len(self.pending_registrants)
+        cycle_duration = self.stats.get('cycle_duration', 0)
         
         successful_regs = self.stats.get('successful_registrations', 0)
-        logger.info(f"[{now}] Status: {available_count} dates with slots, {total_slots} total slots, {pending_count} pending registrants")
+        logger.info(f"[{now}] Status: {available_count} dates with slots, {total_slots} total slots, {pending_count} pending registrants | Cycle: {cycle_duration:.2f}s")
         logger.info(f"🎯 Target months: {sorted(self.target_months) if self.target_months else 'None'} | Server checks: {self.stats['checks_performed']} | ✅ Registered: {successful_regs}")
         
         if self.results:
