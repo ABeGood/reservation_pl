@@ -9,7 +9,6 @@ import os
 from dotenv import load_dotenv
 import traceback
 from datetime import datetime
-import threading
 
 load_dotenv()
 BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -32,7 +31,7 @@ class TelegramBot:
         
         # Event processing
         self.event_processor_running = False
-        self.event_processor_thread = None
+        self.event_processor_task = None
         
         # Admin users (add your Telegram user ID here)
         self.admin_users = set()
@@ -54,44 +53,37 @@ class TelegramBot:
             self.logger.addHandler(handler)
 
         self.register_handlers()
-        self.start_event_processor()
 
-    def start_event_processor(self):
-        """Start event processor thread."""
+    async def start_event_processor(self):
+        """Start event processor as asyncio task."""
         self.event_processor_running = True
-        self.event_processor_thread = threading.Thread(
-            target=self._process_events,
-            name="EventProcessor",
-            daemon=True
-        )
-        self.event_processor_thread.start()
+        self.event_processor_task = asyncio.create_task(self._process_events_async())
         self.logger.info("Event processor started")
 
-    def stop_event_processor(self):
-        """Stop event processor thread."""
+    async def stop_event_processor(self):
+        """Stop event processor task."""
         self.event_processor_running = False
-        if self.event_processor_thread:
-            self.event_processor_thread.join(timeout=5.0)
+        if self.event_processor_task:
+            self.event_processor_task.cancel()
+            try:
+                await self.event_processor_task
+            except asyncio.CancelledError:
+                pass
         self.logger.info("Event processor stopped")
 
-    def _process_events(self):
-        """Process events from the monitor."""
-        import asyncio
-        
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:
-            while self.event_processor_running:
-                try:
-                    event = self.event_queue.get_event(timeout=1.0)
-                    if event:
-                        loop.run_until_complete(self._handle_event(event))
-                except Exception as e:
-                    self.logger.error(f"Error processing event: {e}")
-        finally:
-            loop.close()
+    async def _process_events_async(self):
+        """Process events in the main asyncio loop."""
+        while self.event_processor_running:
+            try:
+                # Non-blocking check for events
+                event = self.event_queue.get_event(timeout=0.1)
+                if event:
+                    await self._handle_event(event)
+                # Small delay to allow other tasks to run
+                await asyncio.sleep(0.1)
+            except Exception as e:
+                self.logger.error(f"Error processing event: {e}")
+                await asyncio.sleep(1.0)  # Longer delay on error
 
     async def _handle_event(self, event: MonitorEvent):
         """Handle a monitor event by sending Telegram notifications."""
@@ -157,14 +149,31 @@ class TelegramBot:
         except Exception as e:
             self.logger.error(f"Failed to send notification to {user_id}: {e}")
 
+    async def _run_bot_async(self):
+        """Async wrapper to start both bot polling and event processing."""
+        # Start event processor
+        await self.start_event_processor()
+        
+        try:
+            # Start bot polling with improved timeout settings
+            await self.bot.polling(
+                non_stop=True, 
+                timeout=20,  # Shorter timeout for long polling
+                request_timeout=30,  # Shorter request timeout
+                allowed_updates=None,
+                skip_pending=True  # Skip old messages on restart
+            )
+        finally:
+            # Ensure event processor is stopped
+            await self.stop_event_processor()
+
     def run_bot(self):
         """Start the bot with improved error handling"""
         self.logger.info("Starting Polish Card reservation bot...")
         try:
-            asyncio.run(self.bot.polling(non_stop=True, timeout=60, request_timeout=90))
+            asyncio.run(self._run_bot_async())
         except KeyboardInterrupt:
             self.logger.info("Bot stopped by user")
-            self.stop_event_processor()
         except Exception as e:
             tb = traceback.format_exc()
             self.logger.error(f"Bot polling stopped due to an error: {e}\nFull traceback:\n{tb}")
