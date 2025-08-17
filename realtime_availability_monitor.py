@@ -358,8 +358,10 @@ class RealTimeAvailabilityMonitor:
         config = self.extract_datepicker_config(verbose=verbose)
         available_dates = []
         
-        # Start from datepicker minDate (temporarily disabled "today only" restriction)
-        current_date = config['min_date']  # Use datepicker minDate instead of today
+        # Start from today, not from datepicker minDate
+        today = datetime.now().date()
+        current_date = max(config['min_date'].date(), today)  # Use today if it's later than minDate
+        current_date = datetime.combine(current_date, datetime.min.time())  # Convert back to datetime
         
         if verbose:
             logger.info(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
