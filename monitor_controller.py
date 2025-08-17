@@ -177,7 +177,7 @@ class MonitorController:
             try:
                 # Signal monitor to stop
                 if self.monitor:
-                    self.monitor.running = False
+                    self.monitor.stop_event.set()
                 
                 self.running = False
                 self.stop_time = datetime.now()
@@ -237,10 +237,11 @@ class MonitorController:
         try:
             if self.monitor:
                 # Enhanced monitoring with event emission
-                self.monitor.run_enhanced_monitoring(
+                self.monitor.start_monitoring(
                     check_interval=self.config['check_interval'],
                     auto_registration=self.config['auto_registration']
                 )
+                self.logger.info("📤 start_monitoring() returned")
         except Exception as e:
             error_msg = f"Monitor loop crashed: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
@@ -249,6 +250,7 @@ class MonitorController:
             with self.lock:
                 self.running = False
                 self.stop_time = datetime.now()
+            self.logger.info("✅ _run_monitor_loop completed")
     
     def get_pending_registrants_count(self) -> int:
         """Get count of pending registrants from database."""

@@ -34,7 +34,7 @@ class RealTimeAvailabilityMonitor:
         self.page_url = page_url
         self.base_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/"
         self.endpoint = "godziny_pokoj_A1.php"
-        self.running = False
+        self.stop_event = threading.Event()
         self.results = {}
         self.available_dates = []
         self.stats = {
@@ -81,14 +81,6 @@ class RealTimeAvailabilityMonitor:
             logger.error(f"❌ {error_msg}")
             emit_error(error_msg, {'exception': str(e)})
             return False
-    
-    def run_enhanced_monitoring(self, check_interval:float, auto_registration:bool):
-        """Enhanced monitoring with event emission. Leverages existing start_monitoring()."""
-        logger.info("🚀 Starting enhanced monitoring with Telegram notifications...")
-        
-        # Simply delegate to the existing start_monitoring method
-        # which already has all the functionality we need
-        self.start_monitoring(max_duration_minutes=None)
         
     def get_captcha_image(self, session_id=None):
         """Fetch CAPTCHA image from server and return as base64 string."""
@@ -421,7 +413,7 @@ class RealTimeAvailabilityMonitor:
             
             # Process results as they complete
             for future in as_completed(future_to_date):
-                if not self.running:
+                if self.stop_event.is_set():
                     break
                 
                 try:
@@ -509,7 +501,7 @@ class RealTimeAvailabilityMonitor:
         logger.info("🔍 CAPTCHA solving: ✅ Enabled via apitruecaptcha.org")
         logger.info("Press Ctrl+C to stop\n")
         
-        self.running = True
+        self.stop_event.clear()
         self.stats['start_time'] = datetime.now().isoformat()
         
         try:
@@ -517,7 +509,7 @@ class RealTimeAvailabilityMonitor:
             cycle_count = 0
             wait_cycles = 0
             
-            while self.running:
+            while not self.stop_event.is_set():
                 cycle_count += 1
                 cycle_start = time.time()
 
@@ -530,7 +522,9 @@ class RealTimeAvailabilityMonitor:
                             if wait_cycles == 1:
                                 logger.info("⏸️  No pending registrants - entering standby mode")
                             logger.info(f"💤 Standby cycle {wait_cycles} - checking for new registrants in {self.db_check_interval}s...")
-                            time.sleep(self.db_check_interval+10)  # AG: Not very nice!
+                            # time.sleep(self.db_check_interval+10)  # AG: Not very nice!
+                            if self.stop_event.wait(timeout=self.db_check_interval+10):
+                                break
                             continue
                         elif wait_cycles > 0:
                             logger.info("🎉 Found pending registrants - resuming active monitoring!")
@@ -587,13 +581,18 @@ class RealTimeAvailabilityMonitor:
                         logger.info(f"\n⏰ Stopping after {max_duration_minutes} minutes")
                         break
                 
-                time.sleep(check_interval)
+                if self.stop_event.wait(timeout=0.5):
+                    break
+
+            self.stop_event.set()
+            logger.info("❌❌❌ Monitoring loop exit.")
                 
         except KeyboardInterrupt:
             logger.info("\n🛑 Monitoring stopped by user")
         finally:
-            self.running = False
+            self.stop_event.set()
             self.save_results()
+            logger.info("🧹 start_monitoring cleanup completed")
     
     def print_status(self):
         """Print current monitoring status with registrant information."""
@@ -644,32 +643,32 @@ class RealTimeAvailabilityMonitor:
         
         logger.info(f"📁 Results saved to: {filename}")
 
-def main():
-    print("Real-time Polish Card Appointment Monitor")
-    print("=========================================")
+# def main():
+#     print("Real-time Polish Card Appointment Monitor")
+#     print("=========================================")
     
-    # Choose monitoring URL
-    print("Select monitoring target:")
-    print("1. pokoj_A1.php (default)")
-    print("2. pokoj_A2.php")
+#     # Choose monitoring URL
+#     print("Select monitoring target:")
+#     print("1. pokoj_A1.php (default)")
+#     print("2. pokoj_A2.php")
     
-    choice = input("Enter choice (1 or 2, default=1): ").strip()
+#     choice = input("Enter choice (1 or 2, default=1): ").strip()
     
-    if choice == "2":
-        page_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A2.php"
-        monitor = RealTimeAvailabilityMonitor(page_url)
-        monitor.endpoint = "godziny_pokoj_A2.php"
-    else:
-        monitor = RealTimeAvailabilityMonitor()
+#     if choice == "2":
+#         page_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A2.php"
+#         monitor = RealTimeAvailabilityMonitor(page_url)
+#         monitor.endpoint = "godziny_pokoj_A2.php"
+#     else:
+#         monitor = RealTimeAvailabilityMonitor()
     
-    # Ask for monitoring duration
-    try:
-        duration_input = input("Enter monitoring duration in minutes (or press Enter for indefinite): ").strip()
-        max_duration = int(duration_input) if duration_input else None
-    except ValueError:
-        max_duration = None
+#     # Ask for monitoring duration
+#     try:
+#         duration_input = input("Enter monitoring duration in minutes (or press Enter for indefinite): ").strip()
+#         max_duration = int(duration_input) if duration_input else None
+#     except ValueError:
+#         max_duration = None
     
-    monitor.start_monitoring(max_duration_minutes=max_duration)
+#     monitor.start_monitoring(max_duration_minutes=max_duration)
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

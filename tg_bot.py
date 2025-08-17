@@ -53,13 +53,6 @@ class TelegramBot:
         
         from logging_config import get_logger
         self.logger = get_logger(__name__)
-        self.logger.setLevel(logging.INFO)
-        
-        if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
 
         # Log configuration
         self.logger.info(f"TelegramBot initialized with {len(self.admin_users)} admin users")
@@ -200,8 +193,7 @@ class TelegramBot:
         except Exception as e:
             tb = traceback.format_exc()
             self.logger.error(f"Bot polling stopped due to an error: {e}\nFull traceback:\n{tb}")
-            sleep(3)
-            self.run_bot()
+            self.logger.error("Bot failed to start properly. Program will exit.")
 
     def register_handlers(self):
         """Register all message handlers"""
@@ -409,17 +401,17 @@ class TelegramBot:
             await self.bot.reply_to(msg, "Use /help to see available commands.")
             
 
-# Usage example
-if __name__ == "__main__":
+# # Usage example
+# if __name__ == "__main__":
     
-    # Initialize and run bot
-    try:
-        bot = TelegramBot(
-            bot_token=BOT_TOKEN,
-        )
-        bot.run_bot()
-    except Exception as e:
-        from logging_config import get_logger
-        logger = get_logger(__name__)
-        logger.error(f"Failed to start bot: {e}")
-        logger.error("Make sure you've set your BOT_TOKEN correctly!")
+#     # Initialize and run bot
+#     try:
+#         bot = TelegramBot(
+#             bot_token=BOT_TOKEN,
+#         )
+#         bot.run_bot()
+#     except Exception as e:
+#         from logging_config import get_logger
+#         logger = get_logger(__name__)
+#         logger.error(f"Failed to start bot: {e}")
+#         logger.error("Make sure you've set your BOT_TOKEN correctly!")
