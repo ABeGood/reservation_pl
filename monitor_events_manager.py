@@ -232,6 +232,22 @@ class EventEmitter:
             priority=1
         )
         return self.event_queue.emit(event)
+    
+    def emit_datepicker_change(self, old_config: Dict[str, Any], new_config: Dict[str, Any], changes: List[str]):
+        """Emit datepicker configuration change event."""
+        event = MonitorEvent(
+            event_type=EventType.DATABASE_UPDATE,  # Reusing existing event type for config changes
+            timestamp=datetime.now(),
+            data={
+                'update_type': 'datepicker_config',
+                'old_config': old_config,
+                'new_config': new_config,
+                'changes': changes
+            },
+            message=f"📅 Datepicker config changed: {', '.join(changes)}",
+            priority=2
+        )
+        return self.event_queue.emit(event)
 
 
 # Global event queue instance
@@ -289,6 +305,11 @@ def emit_monitor_started(config: Dict[str, Any] = None) -> bool:
 def emit_monitor_stopped(stats: Dict[str, Any] = None) -> bool:
     """Emit monitor stopped event using global emitter."""
     return get_event_emitter().emit_monitor_stopped(stats)
+
+
+def emit_datepicker_change(old_config: Dict[str, Any], new_config: Dict[str, Any], changes: List[str]) -> bool:
+    """Emit datepicker configuration change event using global emitter."""
+    return get_event_emitter().emit_datepicker_change(old_config, new_config, changes)
 
 
 if __name__ == "__main__":

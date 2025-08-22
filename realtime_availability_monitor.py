@@ -22,7 +22,8 @@ from monitor_events_manager import (
     emit_slot_found,
     emit_registration_success,
     emit_registration_failed,
-    emit_status_update
+    emit_status_update,
+    emit_datepicker_change
 )
 import base64
 from logging_config import get_logger
@@ -50,6 +51,7 @@ class RealTimeAvailabilityMonitor:
             'last_status_log': None,
             'cycle_duration': 0
         }
+        self.datepicker_config = None
         self.stats_lock = threading.Lock()
         self.pending_registrants = []
         self.target_months = set()
@@ -348,6 +350,32 @@ class RealTimeAvailabilityMonitor:
                 'disabled_days': []
             }
     
+    def _detect_datepicker_changes(self, old_datepicker, new_datepicker):
+        """Detect changes between datepicker configurations."""
+        changes = []
+        
+        # Check date range changes
+        if old_datepicker['min_date'] != new_datepicker['min_date']:
+            changes.append(f"min_date: {old_datepicker['min_date'].strftime('%Y-%m-%d')} → {new_datepicker['min_date'].strftime('%Y-%m-%d')}")
+        
+        if old_datepicker['max_date'] != new_datepicker['max_date']:
+            changes.append(f"max_date: {old_datepicker['max_date'].strftime('%Y-%m-%d')} → {new_datepicker['max_date'].strftime('%Y-%m-%d')}")
+        
+        # Check disabled days changes
+        old_disabled = set(old_datepicker['disabled_days'])
+        new_disabled = set(new_datepicker['disabled_days'])
+        
+        newly_disabled = new_disabled - old_disabled
+        newly_enabled = old_disabled - new_disabled
+        
+        if newly_disabled:
+            changes.append(f"newly_disabled: {sorted(list(newly_disabled))}")
+        
+        if newly_enabled:
+            changes.append(f"newly_enabled: {sorted(list(newly_enabled))}")
+        
+        return changes
+    
     def get_available_dates(self, verbose=False):
         """Get available dates filtered by registrant desired months."""
         if not self.target_months:
@@ -355,24 +383,36 @@ class RealTimeAvailabilityMonitor:
                 logger.info("⏸️  No target months - no pending registrants")
             return []
             
-        config = self.extract_datepicker_config(verbose=verbose)
+        new_datepicker_config = self.extract_datepicker_config(verbose=verbose)
+        # Detect changes
+        if self.datepicker_config is not None:
+            changes = self._detect_datepicker_changes(self.datepicker_config, new_datepicker_config)
+            if changes:
+                logger.info(f"🔄 Datepicker config changed: {changes}")
+                emit_datepicker_change(
+                    old_config=self.datepicker_config,
+                    new_config=new_datepicker_config,
+                    changes=changes
+                )
+        self.datepicker_config = new_datepicker_config
+
         available_dates = []
         
         # Start from today, not from datepicker minDate
         today = datetime.now().date()
-        current_date = max(config['min_date'].date(), today)  # Use today if it's later than minDate
+        current_date = max(self.datepicker_config['min_date'].date(), today)  # Use today if it's later than minDate
         current_date = datetime.combine(current_date, datetime.min.time())  # Convert back to datetime
         
         if verbose:
-            logger.info(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {config['max_date'].strftime('%Y-%m-%d')}")
+            logger.info(f"ℹ️  Checking dates from {current_date.strftime('%Y-%m-%d')} to {self.datepicker_config['max_date'].strftime('%Y-%m-%d')}")
             logger.info(f"🎯 Filtering for target months: {sorted(self.target_months)}")
         
-        while current_date <= config['max_date']:
+        while current_date <= self.datepicker_config['max_date']:
             date_str = current_date.strftime("%Y-%m-%d")
             
             # Only weekdays (Monday=0 to Friday=4) in target months
             if (current_date.weekday() < 5 and 
-                date_str not in config['disabled_days'] and
+                date_str not in self.datepicker_config['disabled_days'] and
                 current_date.month in self.target_months):
                 available_dates.append(date_str)
             
