@@ -131,7 +131,7 @@ def send_registration_request_with_retry(base_url: str, registrant_data: dict, t
             # Attempt registration
             result = _send_registration_attempt(base_url, registrant_data, timeslot_data, captcha_code, session_id)
             
-            # Check if this was a CAPTCHA error
+            # Check if this was a CAPTCHA error (retryable)
             if _is_captcha_error(result):
                 if attempt < max_retries:
                     logger.warning(f"CAPTCHA error detected (attempt {attempt + 1}/{max_retries + 1}). Retrying with new CAPTCHA...")
@@ -143,7 +143,15 @@ def send_registration_request_with_retry(base_url: str, registrant_data: dict, t
                     result['max_retries'] = max_retries
                     return result
             
-            # Success or non-CAPTCHA error - return result
+            # Check if this was a reservation error (non-retryable)
+            elif _is_reservation_error(result):
+                result['error'] = 'Reservation error - slot no longer available'
+                result['attempt'] = attempt + 1
+                result['max_retries'] = max_retries
+                logger.info(f"Reservation error detected - slot unavailable, not retrying")
+                return result
+            
+            # Success or other non-retryable error - return result
             result['attempt'] = attempt + 1
             result['max_retries'] = max_retries
             return result
@@ -300,6 +308,34 @@ def _is_captcha_error(result: dict) -> bool:
     ]
     
     return any(phrase in response_text for phrase in captcha_error_phrases)
+
+
+def _is_reservation_error(result: dict) -> bool:
+    """
+    Check if the response indicates a reservation error (slot no longer available).
+    These errors should NOT trigger retries as the slot is genuinely unavailable.
+    
+    Args:
+        result (dict): Response from _send_registration_attempt
+        
+    Returns:
+        bool: True if this is a reservation error, False otherwise
+    """
+    if not result.get('response_text'):
+        return False
+    
+    response_text = result['response_text'].lower()
+    
+    # Check for specific reservation error indicators
+    reservation_error_phrases = [
+        'błąd rezerwacji',  # Polish: "Reservation error"
+        'termin już zajęty',  # Polish: "Slot already taken"
+        'brak dostępnych terminów',  # Polish: "No available slots"
+        'slot not available',
+        'time slot unavailable'
+    ]
+    
+    return any(phrase in response_text for phrase in reservation_error_phrases)
 
 
 def get_captcha_image(base_url: str, session_id: str) -> dict:
