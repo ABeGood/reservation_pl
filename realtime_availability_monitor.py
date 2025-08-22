@@ -146,12 +146,15 @@ class RealTimeAvailabilityMonitor:
                 slots = slots_by_month[month]
                 registrants = registrants_by_month[month]
                 
+                # Sort slots by date and time to ensure earliest slots go to highest priority registrants
+                slots_sorted = sorted(slots, key=lambda s: (s['date'], s['time']))
+                
                 logger.info(f"📅 Month {month}: {len(slots)} slots, {len(registrants)} registrants")
                 
                 # Distribute slots to registrants based on priority
                 # If more slots than registrants, highest priority registrants get first choice
                 # If more registrants than slots, only highest priority registrants get slots
-                for i, slot in enumerate(slots):
+                for i, slot in enumerate(slots_sorted):
                     if i < len(registrants):
                         registrant = registrants[i]
                         assignments.append((registrant, slot))
