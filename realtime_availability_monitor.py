@@ -31,10 +31,21 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 class RealTimeAvailabilityMonitor:
-    def __init__(self, page_url="https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A1.php"):
-        self.page_url = page_url
-        self.base_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/"
-        self.endpoint = "godziny_pokoj_A1.php"
+    def __init__(self, page_url="https://olsztyn.uw.gov.pl/wizytakartapolaka/pokoj_A1.php", use_mock_server=False):
+        if use_mock_server:
+            self.page_url = page_url.replace("https://olsztyn.uw.gov.pl/wizytakartapolaka/", "http://localhost:5000/")
+            self.base_url = "http://localhost:5000/"
+            self.endpoint = "godziny_pokoj_A1.php"  # Mock server uses same endpoint names
+            # Update endpoint if A2 is in the page URL
+            if "A2" in page_url:
+                self.endpoint = "godziny_pokoj_A2.php"
+        else:
+            self.page_url = page_url
+            self.base_url = "https://olsztyn.uw.gov.pl/wizytakartapolaka/"
+            self.endpoint = "godziny_pokoj_A1.php"
+            # Update endpoint if A2 is in the page URL
+            if "A2" in page_url:
+                self.endpoint = "godziny_pokoj_A2.php"
         self.stop_event = threading.Event()
         self.results = {}
         self.available_dates = []

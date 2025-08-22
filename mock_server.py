@@ -61,6 +61,9 @@ MOCK_TIMESLOTS = {
     "2025-08-06": ["09:00", "10:00", "11:00"],
     "2025-08-07": ["09:00"],
     "2025-08-08": ["10:00", "11:00", "12:00"],
+    "2025-09-01": ["11:00"],
+    "2025-09-02": ["11:00"],
+
 }
 
 def generate_captcha_text():
@@ -121,33 +124,25 @@ REGISTRATION_PAGE_TEMPLATE = """
     <title>Rezerwacja terminu wizyty w WMUW Karta Polaka</title>
 
     <script>
-    var disabledDays = [
-        "2025-03-25","2025-04-21","2025-05-01","2025-06-01","2025-06-02","2025-06-03",
-        "2025-06-04","2025-06-05","2025-06-06","2025-06-07","2025-06-08","2025-06-09",
-        "2025-06-10","2025-06-11","2025-06-12","2025-06-13","2025-06-14","2025-06-15",
-        "2025-09-01","2025-09-02","2025-09-03","2025-09-04","2025-09-05","2025-09-06",
-        "2025-06-21","2025-06-22","2025-06-28","2025-06-29","2025-07-05","2025-07-06",
-        "2025-07-12","2025-07-13","2025-07-19","2025-07-20","2025-07-26","2025-07-27",
-        "2025-08-02","2025-08-03","2025-08-09","2025-08-10","2025-08-16","2025-08-17",
-        "2025-08-23","2025-08-24","2025-08-30","2025-08-31"
-    ];
+var disabledDays =[      "2025-03-25","2025-04-21","2025-05-01","2025-06-01","2025-06-02","2025-06-03","2025-06-04","2025-06-05","2025-06-06","2025-06-07","2025-06-08","2025-06-21","2025-06-22","2025-06-28","2025-06-29","2025-07-05","2025-07-06","2025-07-12","2025-07-13","2025-07-19","2025-07-20","2025-07-26","2025-07-27","2025-08-02","2025-08-03","2025-08-09","2025-08-10","2025-08-16","2025-08-17","2025-08-23","2025-08-24","2025-08-30","2025-08-31","2025-09-06","2025-09-07","2025-09-13","2025-09-14","2025-09-20","2025-09-21","2025-09-27","2025-09-28","2025-10-04","2025-10-05","2025-10-11","2025-10-12","2025-10-18","2025-10-19","2025-10-25","2025-10-26","2025-11-01","2025-11-02","2025-11-08","2025-11-09","2025-11-15","2025-11-16","2025-11-22","2025-11-23","2025-11-29","2025-11-30",];
 
-    function disableSpecificWeekDays(date) {
-        if ((date.getDay() == 1) || (date.getDay() == 2) || (date.getDay() == 3) || (date.getDay() == 4) || (date.getDay() == 5)) {
-            var string = jQuery.datepicker.formatDate('yy-mm-dd', date);
-            return [disabledDays.indexOf(string) == -1];
-        } else {
-            return [false];
-        }
+function disableSpecificWeekDays(date) {
+    if ((date.getDay() == 1) || (date.getDay() == 2) || (date.getDay() == 3) || (date.getDay() == 4)|| (date.getDay() == 5)){
+        var string = jQuery.datepicker.formatDate('yy-mm-dd', date);
+		return [ disabledDays.indexOf(string) == -1 ]
+		return [true];
+    } else {
+        return [false];
     }
-
-    $(function() {
-        $("#datepicker").datepicker({
-            minDate: new Date("2025/06/16"),
-            maxDate: new Date("2025/08/31"),
-            beforeShowDay: disableSpecificWeekDays,
-        });
-    });
+}
+$(function() {
+$('.ui-datepicker').addClass('notranslate');
+$( "#datepicker" ).datepicker	({
+									minDate: new Date("2025/06/16"),
+									maxDate: new Date("2025/11/30"),
+									beforeShowDay: disableSpecificWeekDays,
+								});
+});
 
     function postStuff() {
         var hr = new XMLHttpRequest();
@@ -609,6 +604,57 @@ def api_timeslots():
     """Get current timeslots status (for testing)."""
     return jsonify(MOCK_TIMESLOTS)
 
+@app.route('/api/timeslots/add', methods=['POST'])
+def api_add_timeslots():
+    """Add new timeslots (batch operation)."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        added_count = 0
+        updated_dates = []
+        
+        for date_str, timeslots in data.items():
+            # Validate date format
+            try:
+                datetime.strptime(date_str, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": f"Invalid date format: {date_str}. Use YYYY-MM-DD"}), 400
+            
+            # Validate timeslots format
+            if not isinstance(timeslots, list):
+                return jsonify({"error": f"Timeslots for {date_str} must be a list"}), 400
+            
+            for slot in timeslots:
+                if not isinstance(slot, str) or not re.match(r'^\d{2}:\d{2}$', slot):
+                    return jsonify({"error": f"Invalid time format: {slot}. Use HH:MM"}), 400
+            
+            # Add or extend timeslots for this date
+            if date_str in MOCK_TIMESLOTS:
+                # Add new slots, avoiding duplicates
+                existing_slots = set(MOCK_TIMESLOTS[date_str])
+                new_slots = [slot for slot in timeslots if slot not in existing_slots]
+                MOCK_TIMESLOTS[date_str].extend(new_slots)
+                MOCK_TIMESLOTS[date_str].sort()  # Keep times sorted
+                added_count += len(new_slots)
+            else:
+                # Create new date entry
+                MOCK_TIMESLOTS[date_str] = sorted(timeslots)
+                added_count += len(timeslots)
+            
+            updated_dates.append(date_str)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Added {added_count} timeslots across {len(updated_dates)} dates",
+            "updated_dates": updated_dates,
+            "added_slots": added_count
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
     """Reset all data (for testing)."""
@@ -650,6 +696,7 @@ if __name__ == '__main__':
     print("🔧 API endpoints:")
     print("   - GET /api/registrations - View all registrations")
     print("   - GET /api/timeslots - View current timeslots")
+    print("   - POST /api/timeslots/add - Batch add new timeslots")
     print("   - POST /api/reset - Reset all data")
     print("\nPress Ctrl+C to stop")
     
