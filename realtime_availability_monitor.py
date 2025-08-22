@@ -109,10 +109,113 @@ class RealTimeAvailabilityMonitor:
             logger.error(f"❌ CAPTCHA fetch error: {e}")
             return None, None
 
+    def distribute_registrants_to_slots(self, available_slots):
+        """
+        Distribute pending registrants across available timeslots based on priority and desired months.
+        Lower registrant ID = higher priority.
+        
+        Args:
+            available_slots (list): List of slot dictionaries from get_timeslots()
+            
+        Returns:
+            list: List of (registrant, slot) assignment tuples
+        """
+        if not available_slots or not self.pending_registrants:
+            return []
+        
+        # Group available slots by month
+        slots_by_month = {}
+        for slot in available_slots:
+            slot_month = datetime.strptime(slot['date'], "%Y-%m-%d").month
+            if slot_month not in slots_by_month:
+                slots_by_month[slot_month] = []
+            slots_by_month[slot_month].append(slot)
+        
+        # Group registrants by desired month, sorted by ID (lower ID = higher priority)
+        registrants_by_month = {}
+        for registrant in sorted(self.pending_registrants, key=lambda r: r.id):
+            month = registrant.desired_month
+            if month not in registrants_by_month:
+                registrants_by_month[month] = []
+            registrants_by_month[month].append(registrant)
+        
+        # Create registrant-slot assignments
+        assignments = []
+        for month in slots_by_month:
+            if month in registrants_by_month:
+                slots = slots_by_month[month]
+                registrants = registrants_by_month[month]
+                
+                # Sort slots by date and time to ensure earliest slots go to highest priority registrants
+                slots_sorted = sorted(slots, key=lambda s: (s['date'], s['time']))
+                
+                logger.info(f"📅 Month {month}: {len(slots)} slots, {len(registrants)} registrants")
+                
+                # Distribute slots to registrants based on priority
+                # If more slots than registrants, highest priority registrants get first choice
+                # If more registrants than slots, only highest priority registrants get slots
+                for i, slot in enumerate(slots_sorted):
+                    if i < len(registrants):
+                        registrant = registrants[i]
+                        assignments.append((registrant, slot))
+                        logger.info(f"  🎯 Assigned: {registrant.name} {registrant.surname} (ID:{registrant.id}) → {slot['display_text']}")
+        
+        logger.info(f"📋 Total assignments: {len(assignments)}")
+        return assignments
+
+    def attempt_single_registration(self, registrant, slot):
+        """
+        Attempt registration for a single registrant-slot pair.
+        Used for parallel registration processing.
+        
+        Args:
+            registrant: Registrant object with .to_registration_data() method
+            slot: Slot dictionary with 'date' and 'timeslot_value' keys
+            
+        Returns:
+            dict: Registration attempt result with registrant and slot info
+        """
+        try:
+            logger.info(f"🎯 Starting registration: {registrant.name} {registrant.surname} → {slot['display_text']}")
+            
+            # Prepare registration data
+            registrant_data = registrant.to_registration_data()
+            timeslot_data = {
+                'date': slot['date'],
+                'timeslot_value': slot['timeslot_value']
+            }
+            
+            # Send registration request with built-in CAPTCHA retry mechanism
+            registration_result = send_registration_request_with_retry(
+                base_url=self.base_url,
+                registrant_data=registrant_data,
+                timeslot_data=timeslot_data,
+                max_retries=12
+            )
+            
+            return {
+                'registrant': registrant,
+                'slot': slot,
+                'registrant_data': registrant_data,
+                'result': registration_result,
+                'success': registration_result.get('success', False)
+            }
+            
+        except Exception as e:
+            error_msg = f"Registration attempt failed for {registrant.name}: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            return {
+                'registrant': registrant,
+                'slot': slot,
+                'registrant_data': registrant.to_registration_data() if hasattr(registrant, 'to_registration_data') else {},
+                'result': {'success': False, 'error': error_msg},
+                'success': False
+            }
+
     def attempt_auto_registration(self, available_slots):
         """
-        Attempt automatic registration for available slots.
-        Matches slots to registrants by month and attempts registration.
+        Attempt automatic registration using parallel processing and smart distribution.
+        Distributes registrants across slots by priority and runs registration attempts in parallel.
         
         Args:
             available_slots (list): List of slot dictionaries from get_timeslots()
@@ -123,136 +226,130 @@ class RealTimeAvailabilityMonitor:
         if not available_slots or not self.pending_registrants:
             return []
         
+        # Step 1: Distribute registrants to slots based on priority and desired months
+        assignments = self.distribute_registrants_to_slots(available_slots)
+        
+        if not assignments:
+            logger.info("⏭️  No matching registrant-slot assignments found")
+            return []
+        
+        logger.info(f"🚀 Starting PARALLEL registration for {len(assignments)} assignments...")
+        
         successful_registrations = []
+        max_workers = min(8, len(assignments))  # Use up to 8 parallel workers
         
-        logger.info(f"🎯 Attempting auto-registration for {len(available_slots)} available slots...")
-        
-        for slot in available_slots:
-            slot_date = slot['date']  # YYYY-MM-DD format
-            slot_month = datetime.strptime(slot_date, "%Y-%m-%d").month
+        # Step 2: Execute registration attempts in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all registration attempts
+            future_to_assignment = {
+                executor.submit(self.attempt_single_registration, registrant, slot): (registrant, slot)
+                for registrant, slot in assignments
+            }
             
-            # Find first pending registrant for this month (ID order = priority order)
-            matching_registrant = None
-            for registrant in sorted(self.pending_registrants, key=lambda r: r.id):
-                if registrant.desired_month == slot_month:
-                    matching_registrant = registrant
-                    break
+            completed_count = 0
+            total_assignments = len(assignments)
             
-            if not matching_registrant:
-                logger.info(f"⏭️  No matching registrant for {slot_date} (month {slot_month})")
-                continue
-                
-            logger.info(f"🎯 Attempting registration: {matching_registrant.name} {matching_registrant.surname} → {slot['display_text']}")
-            
-            try:
-                # Prepare registration data
-                registrant_data = matching_registrant.to_registration_data()
-                timeslot_data = {
-                    'date': slot['date'],
-                    'timeslot_value': slot['timeslot_value']
-                }
-                
-                # Send registration request with built-in CAPTCHA retry mechanism
-                logger.info(f"📤 Sending registration request with automatic CAPTCHA retry...")
-                registration_result = send_registration_request_with_retry(
-                    base_url=self.base_url,
-                    registrant_data=registrant_data,
-                    timeslot_data=timeslot_data,
-                    max_retries=12
-                )
-                
-                # Process result
-                if registration_result.get('success'):
-                    # Generate reservation ID and update database
-                    import uuid
+            # Process results as they complete
+            for future in as_completed(future_to_assignment):
+                try:
+                    attempt_result = future.result()
+                    completed_count += 1
                     
-                    # Use registration code from success data if available, otherwise generate one
-                    success_data = registration_result.get('success_data')
-                    if success_data and success_data.get('registration_code'):
-                        reservation_id = f"{success_data['registration_code']}"
-                    else:
-                        reservation_id = f"AUTO_{uuid.uuid4().hex[:8].upper()}"
+                    registrant = attempt_result['registrant']
+                    slot = attempt_result['slot']
+                    registration_result = attempt_result['result']
                     
-                    success = create_reservation_for_registrant(
-                        registrant_id=matching_registrant.id,
-                        reservation_id=reservation_id,
-                        success_data=success_data
-                    )
+                    logger.info(f"📋 Completed {completed_count}/{total_assignments}: {registrant.name} {registrant.surname}")
                     
-                    if success:
-                        # Emit registration success event
-                        emit_registration_success(
-                            registrant_data=registrant_data,
-                            slot_data=slot
-                        )
+                    # Process successful registration
+                    if attempt_result['success']:
+                        # Generate reservation ID and update database
+                        import uuid
                         
-                        attempt_info = f" (attempt {registration_result.get('attempt', 1)}/{registration_result.get('max_retries', 3) + 1})" if registration_result.get('attempt', 1) > 1 else ""
-                        logger.info(f"✅ REGISTRATION SUCCESS: {matching_registrant.name} {matching_registrant.surname}{attempt_info}")
-                        
-                        if success_data:
-                            logger.info(f"   📅 Confirmed: {success_data.get('appointment_date')} {success_data.get('appointment_time')} - {success_data.get('room')}")
-                            logger.info(f"   📧 Email: {success_data.get('email')}")
-                            logger.info(f"   📞 Phone: {success_data.get('phone')}")
-                            logger.info(f"   🆔 Code: {success_data.get('registration_code')}")
+                        success_data = registration_result.get('success_data')
+                        if success_data and success_data.get('registration_code'):
+                            reservation_id = f"{success_data['registration_code']}"
                         else:
-                            logger.info(f"   📅 Slot: {slot['display_text']}")
+                            reservation_id = f"AUTO_{uuid.uuid4().hex[:8].upper()}"
                         
-                        logger.info(f"   🆔 Reservation: {reservation_id}")
-                        
-                        successful_registrations.append({
-                            'registrant_id': matching_registrant.id,
-                            'registrant_name': f"{matching_registrant.name} {matching_registrant.surname}",
-                            'reservation_id': reservation_id,
-                            'slot_info': slot,
-                            'registration_result': registration_result
-                        })
-                        
-                        # Remove from pending list to avoid re-attempts
-                        self.pending_registrants = [r for r in self.pending_registrants if r.id != matching_registrant.id]
-                        
-                        # Update target months after removing registrant
-                        self.target_months = set(r.desired_month for r in self.pending_registrants)
-                        
-                    else:
-                        error_msg = f"Database update failed for {matching_registrant.name}"
-                        logger.error(f"❌ {error_msg}")
-                        emit_registration_failed(
-                            registrant_data=registrant_data,
-                            slot_data=slot,
-                            error=error_msg
+                        success = create_reservation_for_registrant(
+                            registrant_id=registrant.id,
+                            reservation_id=reservation_id,
+                            success_data=success_data
                         )
                         
-                else:
-                    attempt_info = f" (failed after {registration_result.get('attempt', 1)} attempts)" if registration_result.get('attempt') else ""
-                    error_msg = registration_result.get('message') or registration_result.get('error', 'Unknown error')
-                    full_error_msg = f"Registration failed{attempt_info}: {error_msg}"
-                    logger.error(f"❌ {full_error_msg}")
+                        if success:
+                            # Emit registration success event
+                            emit_registration_success(
+                                registrant_data=attempt_result['registrant_data'],
+                                slot_data=slot
+                            )
+                            
+                            attempt_info = f" (attempt {registration_result.get('attempt', 1)}/{registration_result.get('max_retries', 12) + 1})" if registration_result.get('attempt', 1) > 1 else ""
+                            logger.info(f"✅ REGISTRATION SUCCESS: {registrant.name} {registrant.surname}{attempt_info}")
+                            
+                            if success_data:
+                                logger.info(f"   📅 Confirmed: {success_data.get('appointment_date')} {success_data.get('appointment_time')} - {success_data.get('room')}")
+                                logger.info(f"   📧 Email: {success_data.get('email')}")
+                                logger.info(f"   📞 Phone: {success_data.get('phone')}")
+                                logger.info(f"   🆔 Code: {success_data.get('registration_code')}")
+                            else:
+                                logger.info(f"   📅 Slot: {slot['display_text']}")
+                            
+                            logger.info(f"   🆔 Reservation: {reservation_id}")
+                            
+                            successful_registrations.append({
+                                'registrant_id': registrant.id,
+                                'registrant_name': f"{registrant.name} {registrant.surname}",
+                                'reservation_id': reservation_id,
+                                'slot_info': slot,
+                                'registration_result': registration_result
+                            })
+                            
+                            # Remove from pending list to avoid re-attempts
+                            self.pending_registrants = [r for r in self.pending_registrants if r.id != registrant.id]
+                            
+                        else:
+                            error_msg = f"Database update failed for {registrant.name}"
+                            logger.error(f"❌ {error_msg}")
+                            emit_registration_failed(
+                                registrant_data=attempt_result['registrant_data'],
+                                slot_data=slot,
+                                error=error_msg
+                            )
                     
-                    emit_registration_failed(
-                        registrant_data=registrant_data,
-                        slot_data=slot,
-                        error=full_error_msg
-                    )
-                    
-                # Be nice to server between attempts
-                time.sleep(0.2)
+                    else:
+                        # Registration failed
+                        attempt_info = f" (failed after {registration_result.get('attempt', 1)} attempts)" if registration_result.get('attempt') else ""
+                        error_msg = registration_result.get('message') or registration_result.get('error', 'Unknown error')
+                        full_error_msg = f"Registration failed{attempt_info}: {error_msg}"
+                        logger.error(f"❌ {full_error_msg}")
+                        
+                        emit_registration_failed(
+                            registrant_data=attempt_result['registrant_data'],
+                            slot_data=slot,
+                            error=full_error_msg
+                        )
                 
-            except Exception as e:
-                error_msg = f"Registration error for {matching_registrant.name}: {str(e)}"
-                logger.error(f"❌ {error_msg}")
-                emit_registration_failed(
-                    registrant_data=matching_registrant.to_registration_data(),
-                    slot_data=slot,
-                    error=error_msg
-                )
-                continue
+                except Exception as e:
+                    registrant, slot = future_to_assignment[future]
+                    error_msg = f"Parallel registration error for {registrant.name}: {str(e)}"
+                    logger.error(f"❌ {error_msg}")
+                    emit_registration_failed(
+                        registrant_data=registrant.to_registration_data(),
+                        slot_data=slot,
+                        error=error_msg
+                    )
         
+        # Step 3: Update target months after successful registrations
         if successful_registrations:
-            logger.info(f"🎉 AUTO-REGISTRATION SUMMARY: {len(successful_registrations)} successful registrations!")
+            self.target_months = set(r.desired_month for r in self.pending_registrants)
+            
+            logger.info(f"🎉 PARALLEL REGISTRATION SUMMARY: {len(successful_registrations)} successful registrations!")
             with self.stats_lock:
                 self.stats['successful_registrations'] = self.stats.get('successful_registrations', 0) + len(successful_registrations)
         else:
-            logger.info("ℹ️  No successful registrations in this attempt")
+            logger.info("ℹ️  No successful registrations in parallel attempt")
             
         return successful_registrations
 
@@ -597,6 +694,9 @@ class RealTimeAvailabilityMonitor:
                     time.sleep(1)  # Wait before retrying
                     continue
                 
+                # Track whether auto-registration was attempted (for immediate cycle restart)
+                auto_registration_attempted = False
+                
                 # Attempt auto-registration if slots are available
                 if result['total_available_slots'] > 0:
                     logger.info(f"🔥 SLOTS DETECTED! Attempting auto-registration...")
@@ -610,6 +710,7 @@ class RealTimeAvailabilityMonitor:
                     
                     if auto_registration:
                         successful_registrations = self.attempt_auto_registration(result['registration_data'])
+                        auto_registration_attempted = True
                         
                         if successful_registrations:
                             # Refresh registrant list after successful registrations
@@ -619,6 +720,9 @@ class RealTimeAvailabilityMonitor:
                             # If no more pending registrants, we can reduce frequency
                             if not self.pending_registrants:
                                 logger.info("🎉 All registrants have been registered! Switching to standby mode...")
+                        
+                        # After auto-registration attempt, immediately start new cycle
+                        logger.info("🔄 IMMEDIATE RESTART: Starting new full monitoring cycle after registration attempts...")
                 
                 # Update cycle duration
                 cycle_end = time.time()
@@ -629,17 +733,18 @@ class RealTimeAvailabilityMonitor:
                 # Show current status (limited to once per minute)
                 self.print_status_if_needed()
                 
-                # Emit status updates periodically
-                # with self.stats_lock:
-                #     if self.stats['checks_performed'] % 20 == 0:  # Every 20 checks
-                #         emit_status_update(self.stats.copy())
-                
                 # Check max duration
                 if max_duration_minutes:
                     elapsed_minutes = (time.time() - start_time) / 60
                     if elapsed_minutes >= max_duration_minutes:
                         logger.info(f"\n⏰ Stopping after {max_duration_minutes} minutes")
                         break
+                
+                # If auto-registration was attempted, immediately continue to next cycle
+                # Otherwise, wait for the normal check interval
+                if auto_registration_attempted:
+                    logger.info("⚡ Skipping wait - starting next cycle immediately")
+                    continue  # Skip the wait and start new cycle immediately
                 
                 if self.stop_event.wait(timeout=check_interval):
                     break

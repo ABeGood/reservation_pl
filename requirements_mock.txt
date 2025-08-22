@@ -1,0 +1,7 @@
+# Requirements for mock server
+Flask==2.3.3
+Pillow==10.0.1
+
+# These are already in your main requirements
+# requests
+# python-dotenv

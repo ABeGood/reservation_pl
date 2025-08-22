@@ -1,0 +1,119 @@
+[
+    {
+        "name": "Diana",
+        "surname": "Shelekhan",
+        "citizenship": "UKRAINE",
+        "email": "Irynafirman1@gmail.com",
+        "phone": "781179990",
+        "application_type": "ADULT",
+        "desired_month": 9
+    },
+    {
+        "name": "Olena",
+        "surname": "Kurylenko",
+        "citizenship": "UKRAINE",
+        "email": "tsuguluk@gmail.com",
+        "phone": "796033619",
+        "application_type": "ADULT",
+        "desired_month": 9
+    },
+    {
+        "name": "Mykola",
+        "surname": "Hordasevych",
+        "citizenship": "UKRAINE",
+        "email": "chyrskyimykola@gmail.com",
+        "phone": "791263011",
+        "application_type": "ADULT",
+        "desired_month": 9
+    },
+    {
+        "name": "Volodymyr",
+        "surname": "Beno",
+        "citizenship": "UKRAINE",
+        "email": "Sobolvadym1979@gmail.com",
+        "phone": "793686608",
+        "application_type": "ADULT",
+        "desired_month": 10
+    },
+    {
+        "name": "Anton",
+        "surname": "Ustinyenkov",
+        "citizenship": "UKRAINE",
+        "email": "Roshkaniukr@gmail.com",
+        "phone": "888624012",
+        "application_type": "ADULT",
+        "desired_month": 10
+    },
+    {
+        "name": "Tetiana",
+        "surname": "Pavliuk",
+        "citizenship": "UKRAINE",
+        "email": "Ruslanvivcar4@gmail.com",
+        "phone": "796575257",
+        "application_type": "ADULT",
+        "desired_month": 10
+    },
+    {
+        "name": "Anastasiia",
+        "surname": "Hryhorieva",
+        "citizenship": "UKRAINE",
+        "email": "Nina.usa2023@gmail.com",
+        "phone": "511337854",
+        "application_type": "ADULT",
+        "desired_month": 11
+    },
+    {
+        "name": "Vladyslav",
+        "surname": "Nezghoda",
+        "citizenship": "UKRAINE",
+        "email": "Viacheslavtkach12@gmail.com",
+        "phone": "573338176",
+        "application_type": "ADULT",
+        "desired_month": 11
+    },
+    {
+        "name": "Bohdan",
+        "surname": "Nezghoda",
+        "citizenship": "UKRAINE",
+        "email": "Halaziukivan3@gmail.com",
+        "phone": "794401028",
+        "application_type": "ADULT",
+        "desired_month": 11
+    },
+    {
+        "name": "Tetiana",
+        "surname": "Liakh",
+        "citizenship": "UKRAINE",
+        "email": "kelichavyi@gmail.com",
+        "phone": "727884040",
+        "application_type": "ADULT",
+        "desired_month": 11
+    },
+    {
+        "name": "Oleh",
+        "surname": "Koko",
+        "citizenship": "UKRAINE",
+        "email": "Olehkovalov1@gmail.com",
+        "phone": "533777591",
+        "application_type": "ADULT",
+        "desired_month": 11
+    },
+    {
+        "name": "Mykola",
+        "surname": "Beno",
+        "citizenship": "UKRAINE",
+        "email": "kondrashovsofiia@gmail.com",
+        "phone": "510738080",
+        "application_type": "ADULT",
+        "desired_month": 11
+    },
+    {
+        "name": "Olha",
+        "surname": "Vasylieva",
+        "citizenship": "UKRAINE",
+        "email": "Visa.express.pl@gmail.com",
+        "phone": "573869992",
+        "application_type": "ADULT",
+        "desired_month": 11
+    }
+]

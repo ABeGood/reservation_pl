@@ -15,7 +15,7 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def load_mock_registrants_to_db(json_file_path: str = "mock_registrants.json") -> List[int]:
+def load_mock_registrants_to_db(json_file_path: str = "registrants.json") -> List[int]:
     """
     Load registrants from JSON file to database.
     
